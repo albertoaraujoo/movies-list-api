@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -6,6 +6,16 @@ interface FindOrCreateUserDto {
   googleId: string;
   email: string;
   name: string;
+  image?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  totalMovies: number;
+  watchedMovies: number;
 }
 
 @Injectable()
@@ -28,10 +38,19 @@ export class UsersService {
     });
 
     if (existingUser) {
-      if (existingUser.name !== data.name || existingUser.email !== data.email) {
+      const hasChanges =
+        existingUser.name !== data.name ||
+        existingUser.email !== data.email ||
+        (data.image !== undefined && existingUser.image !== data.image);
+
+      if (hasChanges) {
         return this.prisma.user.update({
           where: { id: existingUser.id },
-          data: { name: data.name, email: data.email },
+          data: {
+            name: data.name,
+            email: data.email,
+            ...(data.image !== undefined && { image: data.image }),
+          },
         });
       }
       return existingUser;
@@ -40,5 +59,22 @@ export class UsersService {
     const newUser = await this.prisma.user.create({ data });
     this.logger.log(`Novo usuário criado: ${newUser.email}`);
     return newUser;
+  }
+
+  async getProfile(userId: string): Promise<UserProfile> {
+    const [user, totalMovies, watchedMovies] = await this.prisma.$transaction([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, email: true, image: true },
+      }),
+      this.prisma.movie.count({ where: { userId } }),
+      this.prisma.movie.count({ where: { userId, watched: true } }),
+    ]);
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    return { ...user, totalMovies, watchedMovies };
   }
 }

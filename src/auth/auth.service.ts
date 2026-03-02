@@ -8,6 +8,7 @@ interface GoogleTokenPayload {
   sub: string;
   email: string;
   name: string;
+  picture?: string;
 }
 
 export interface AuthResponse {
@@ -16,6 +17,7 @@ export interface AuthResponse {
     id: string;
     email: string;
     name: string;
+    image: string | null;
   };
 }
 
@@ -41,6 +43,7 @@ export class AuthService {
       googleId: payload.sub,
       email: payload.email,
       name: payload.name,
+      image: payload.picture,
     });
 
     const accessToken = this.generateJwt(user.id, user.email);
@@ -53,6 +56,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
+        image: user.image,
       },
     };
   }
@@ -74,6 +78,7 @@ export class AuthService {
         sub: payload.sub,
         email: payload.email,
         name: payload.name,
+        picture: payload.picture ?? undefined,
       };
     } catch (error) {
       this.logger.warn(`Falha na verificação do token Google: ${(error as Error).message}`);

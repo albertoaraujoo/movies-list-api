@@ -25,6 +25,7 @@ API available at `http://localhost:3000/api/v1`.
 
 | | 🇧🇷 Português | 🇺🇸 English |
 |---|---|---|
+| **Frontend (Next.js)** | [docs/frontend-integration.md](docs/frontend-integration.md) | [docs/en/frontend-integration.md](docs/en/frontend-integration.md) |
 | Setup & Configuration | [docs/setup.md](docs/setup.md) | [docs/en/setup.md](docs/en/setup.md) |
 | Authentication | [docs/authentication.md](docs/authentication.md) | [docs/en/authentication.md](docs/en/authentication.md) |
 | API Reference | [docs/api-reference.md](docs/api-reference.md) | [docs/en/api-reference.md](docs/en/api-reference.md) |
