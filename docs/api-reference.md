@@ -1,0 +1,167 @@
+# Referência da API
+
+Base URL: `http://localhost:3000/api/v1`
+
+Todas as rotas de `/movies` exigem o header:
+```
+Authorization: Bearer {accessToken}
+```
+
+---
+
+## Formato de resposta padrão
+
+**Sucesso:**
+```json
+{
+  "data": { ... },
+  "timestamp": "2026-03-02T10:00:00.000Z",
+  "path": "/api/v1/movies"
+}
+```
+
+**Erro:**
+```json
+{
+  "statusCode": 404,
+  "message": "Filme com ID \"xyz\" não encontrado",
+  "path": "/api/v1/movies/xyz",
+  "timestamp": "2026-03-02T10:00:00.000Z"
+}
+```
+
+---
+
+## Autenticação
+
+### `POST /auth/google`
+Autentica via Google e retorna um JWT da aplicação.
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `idToken` | string | Token ID retornado pelo Google SDK |
+
+---
+
+## Filmes
+
+### `POST /movies`
+Cria um novo filme. Busca automaticamente cartaz, diretor e ano na TMDB.
+
+```json
+{
+  "title": "Inception",
+  "notes": "Indicado pelo João",
+  "tmdbId": 27205
+}
+```
+
+> `tmdbId` é opcional. Se informado, usa esse ID específico da TMDB. Caso contrário, busca pelo título.
+> `director`, `year` e `posterPath` são preenchidos automaticamente via TMDB.
+
+---
+
+### `GET /movies`
+Lista os filmes do usuário com filtros e paginação.
+
+**Query params:**
+
+| Parâmetro | Tipo | Descrição |
+|---|---|---|
+| `search` | string | Busca em título, diretor e notas |
+| `watched` | boolean | `true` ou `false` |
+| `year` | number | Filtrar por ano |
+| `director` | string | Filtrar por diretor (parcial) |
+| `page` | number | Página (padrão: `1`) |
+| `limit` | number | Itens por página (padrão: `20`, máx: `100`) |
+
+**Exemplo:** `GET /movies?search=batman&watched=false&page=1&limit=10`
+
+**Response:**
+```json
+{
+  "data": {
+    "data": [ { ...movie } ],
+    "meta": {
+      "total": 42,
+      "page": 1,
+      "limit": 10,
+      "totalPages": 5
+    }
+  }
+}
+```
+
+---
+
+### `GET /movies/:id`
+Retorna um filme específico. Retorna `403` se o filme pertence a outro usuário.
+
+---
+
+### `PATCH /movies/:id`
+Atualiza um filme. Todos os campos são opcionais.
+
+```json
+{
+  "watched": true,
+  "notes": "Assistido em março de 2026"
+}
+```
+
+> Marcar `watched: true` **remove automaticamente** o filme da lista de sorteados.
+
+---
+
+### `DELETE /movies/:id`
+Remove o filme permanentemente (cascade apaga o registro em `DrawnMovie`).
+
+---
+
+### `POST /movies/:id/sync-tmdb`
+Sincroniza manualmente os dados do filme com a TMDB (cartaz, diretor, ano).
+
+**Body (opcional):**
+```json
+{ "tmdbId": 27205 }
+```
+
+> Se `tmdbId` não for informado, busca pelo título do filme cadastrado.
+
+---
+
+## Lista de Sorteados
+
+### `POST /movies/draw`
+Sorteia um filme aleatório elegível.
+
+**Regras:**
+- Somente filmes `watched: false` e não presentes na lista de sorteados são elegíveis
+- Limite máximo de **30 filmes** na lista de sorteados por usuário
+- Se a lista estiver cheia ou não houver filmes elegíveis → `400 Bad Request`
+
+---
+
+### `GET /movies/drawn`
+Retorna a lista de sorteados ordenada por `order` (ordem de inserção).
+
+---
+
+### `DELETE /movies/drawn/:drawnId`
+Remove um item da lista de sorteados pelo ID do registro `DrawnMovie`.
+
+---
+
+## Códigos de status utilizados
+
+| Código | Significado |
+|---|---|
+| `200` | Sucesso |
+| `201` | Criado |
+| `204` | Sem conteúdo (DELETE bem-sucedido) |
+| `400` | Requisição inválida (validação ou regra de negócio) |
+| `401` | Não autenticado |
+| `403` | Acesso negado (recurso de outro usuário) |
+| `404` | Não encontrado |
+| `429` | Rate limit excedido (100 req/min) |
+| `500` | Erro interno do servidor |

@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  googleId  String   @unique
+  movies    Movie[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Movie {
+  id         String      @id @default(uuid())
+  title      String
+  director   String?
+  year       Int?
+  notes      String?
+  watched    Boolean     @default(false)
+  tmdbId     Int?
+  posterPath String?
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drawn      DrawnMovie?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([userId, watched])
+  @@map("movies")
+}
+
+model DrawnMovie {
+  id      String   @id @default(uuid())
+  movieId String   @unique
+  movie   Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  order   Int
+  drawnAt DateTime @default(now())
+
+  @@map("drawn_movies")
+}
