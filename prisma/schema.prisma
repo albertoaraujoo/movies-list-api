@@ -24,19 +24,22 @@ model User {
 }
 
 model Movie {
-  id         String      @id @default(uuid())
-  title      String
-  director   String?
-  year       Int?
-  notes      String?
-  watched    Boolean     @default(false)
-  tmdbId     Int?
-  posterPath String?
-  userId     String
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  drawn      DrawnMovie?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id                String      @id @default(uuid())
+  title             String
+  director          String?
+  year              Int?
+  notes             String?
+  watched           Boolean     @default(false)
+  tmdbId            Int?
+  posterPath        String?
+  overview          String?
+  runtime           Int?
+  watchProvidersBr  Json?
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drawn             DrawnMovie?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   @@index([userId])
   @@index([userId, watched])

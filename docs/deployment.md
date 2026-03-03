@@ -73,6 +73,17 @@ NODE_ENV="production"
 
 ---
 
+## 6. Depois de adicionar novos campos (ex: overview, runtime, watchProvidersBr)
+
+1. **Local:** rode a migration para testar:
+   ```bash
+   npx prisma migrate dev
+   ```
+2. **Subir:** faça commit e push das alterações (incluindo `prisma/schema.prisma` e a pasta `prisma/migrations/`).
+3. **Render:** o **Start Command** já inclui `npm run prisma:migrate:prod` → ao fazer deploy, as migrations pendentes são aplicadas antes de subir a API. Nada extra para configurar.
+
+---
+
 ## Notas importantes
 
 - O comando `prisma migrate deploy` (não `dev`) é usado em produção — ele aplica migrations existentes sem criar novas

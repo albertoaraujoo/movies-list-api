@@ -24,9 +24,30 @@ interface TmdbMovieDetailsResponse {
   title: string;
   release_date: string;
   poster_path: string | null;
+  overview: string | null;
+  runtime: number | null;
   credits: {
     crew: TmdbCrewMember[];
   };
+}
+
+export interface TmdbWatchProvider {
+  logo_path: string | null;
+  provider_id: number;
+  provider_name: string;
+  display_priority: number;
+}
+
+export interface TmdbWatchProvidersBr {
+  link?: string;
+  flatrate?: TmdbWatchProvider[];
+  rent?: TmdbWatchProvider[];
+  buy?: TmdbWatchProvider[];
+}
+
+interface TmdbWatchProvidersResponse {
+  id: number;
+  results: Record<string, TmdbWatchProvidersBr>;
 }
 
 export interface TmdbEnrichedData {
@@ -35,6 +56,9 @@ export interface TmdbEnrichedData {
   director: string | null;
   year: number | null;
   posterPath: string | null;
+  overview: string | null;
+  runtime: number | null;
+  watchProvidersBr: TmdbWatchProvidersBr | null;
 }
 
 @Injectable()
@@ -103,10 +127,46 @@ export class TmdbService {
       const director = data.credits.crew.find((c) => c.job === 'Director')?.name ?? null;
       const year = data.release_date ? new Date(data.release_date).getFullYear() : null;
       const posterPath = data.poster_path ? `${this.imageUrl}${data.poster_path}` : null;
+      const overview = data.overview ?? null;
+      const runtime = data.runtime ?? null;
 
-      return { tmdbId: data.id, title: data.title, director, year, posterPath };
+      const watchProvidersBr = await this.getWatchProvidersBr(tmdbId);
+
+      return {
+        tmdbId: data.id,
+        title: data.title,
+        director,
+        year,
+        posterPath,
+        overview,
+        runtime,
+        watchProvidersBr,
+      };
     } catch (error) {
       this.logger.warn(`TMDB: falha ao buscar detalhes do ID ${tmdbId}: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Busca onde assistir/alugar/comprar no Brasil (dados via JustWatch).
+   * Retorna flatrate (streaming), rent (aluguel) e buy (compra).
+   */
+  async getWatchProvidersBr(tmdbId: number): Promise<TmdbWatchProvidersBr | null> {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.get<TmdbWatchProvidersResponse>(
+          `${this.baseUrl}/movie/${tmdbId}/watch/providers`,
+          { headers: this.authHeaders },
+        ),
+      );
+
+      const br = response.data.results?.BR ?? null;
+      return br;
+    } catch (error) {
+      this.logger.warn(
+        `TMDB: falha ao buscar watch providers (BR) do ID ${tmdbId}: ${(error as Error).message}`,
+      );
       return null;
     }
   }
