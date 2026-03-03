@@ -23,6 +23,8 @@ export interface PaginatedMovies {
     limit: number;
     totalPages: number;
   };
+  watched: Movie[];
+  unwatched: Movie[];
 }
 
 export interface DrawnMovieWithMovie extends DrawnMovie {
@@ -129,7 +131,7 @@ export class MoviesService {
       }),
     };
 
-    const [data, total] = await this.prisma.$transaction([
+    const [data, total, watchedList, unwatchedList] = await this.prisma.$transaction([
       this.prisma.movie.findMany({
         where,
         skip,
@@ -138,11 +140,23 @@ export class MoviesService {
         include: { drawn: true },
       }),
       this.prisma.movie.count({ where }),
+      this.prisma.movie.findMany({
+        where: { userId, watched: true },
+        orderBy: { updatedAt: 'desc' },
+        include: { drawn: true },
+      }),
+      this.prisma.movie.findMany({
+        where: { userId, watched: false },
+        orderBy: { createdAt: 'desc' },
+        include: { drawn: true },
+      }),
     ]);
 
     return {
       data: data.map((m) => this.withProviderLogoUrls(m)),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      watched: watchedList.map((m) => this.withProviderLogoUrls(m)),
+      unwatched: unwatchedList.map((m) => this.withProviderLogoUrls(m)),
     };
   }
 
@@ -268,6 +282,50 @@ export class MoviesService {
 
       return { ...drawn, movie: this.withProviderLogoUrls(drawn.movie) };
     });
+  }
+
+  async addToDrawnList(userId: string, movieId: string): Promise<DrawnMovieWithMovie> {
+    const movie = await this.prisma.movie.findUnique({
+      where: { id: movieId },
+      include: { drawn: true },
+    });
+
+    if (!movie) {
+      throw new NotFoundException(`Filme com ID "${movieId}" não encontrado`);
+    }
+
+    if (movie.userId !== userId) {
+      throw new ForbiddenException('Acesso negado: este filme pertence a outro usuário');
+    }
+
+    if (movie.drawn) {
+      throw new BadRequestException('Este filme já está na lista de sorteados');
+    }
+
+    const drawnCount = await this.prisma.drawnMovie.count({
+      where: { movie: { userId } },
+    });
+
+    if (drawnCount >= DRAWN_LIST_MAX_SIZE) {
+      throw new BadRequestException(
+        `A lista de sorteados atingiu o limite máximo de ${DRAWN_LIST_MAX_SIZE} itens. Remova alguns antes de adicionar.`,
+      );
+    }
+
+    const maxOrderResult = await this.prisma.drawnMovie.aggregate({
+      where: { movie: { userId } },
+      _max: { order: true },
+    });
+
+    const nextOrder = (maxOrderResult._max.order ?? 0) + 1;
+
+    const drawn = await this.prisma.drawnMovie.create({
+      data: { movieId, order: nextOrder },
+      include: { movie: true },
+    });
+
+    this.logger.log(`Filme "${movie.title}" adicionado à lista de sorteados (posição ${nextOrder})`);
+    return { ...drawn, movie: this.withProviderLogoUrls(drawn.movie) } as DrawnMovieWithMovie;
   }
 
   async getDrawnList(userId: string): Promise<DrawnMovieWithMovie[]> {

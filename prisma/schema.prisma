@@ -35,6 +35,7 @@ model Movie {
   overview          String?
   runtime           Int?
   watchProvidersBr  Json?
+  userRating        Float?
   userId            String
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   drawn             DrawnMovie?

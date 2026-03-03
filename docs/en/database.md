@@ -34,6 +34,7 @@
 | `overview` | String? | Synopsis (TMDB) |
 | `runtime` | Int? | Duration in minutes (TMDB) |
 | `watchProvidersBr` | Json? | Where to watch in Brazil: flatrate, rent, buy (JustWatch) |
+| `userRating` | Float? | User rating (0 to 10 in 0.5 steps) |
 | `userId` | String (FK) | Movie owner |
 
 ### `drawn_movies`

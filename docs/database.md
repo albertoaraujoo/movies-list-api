@@ -34,6 +34,7 @@
 | `overview` | String? | Sinopse (TMDB) |
 | `runtime` | Int? | Duração em minutos (TMDB) |
 | `watchProvidersBr` | Json? | Onde assistir no Brasil: flatrate, rent, buy (JustWatch) |
+| `userRating` | Float? | Nota do usuário (0 a 10 em intervalos de 0,5) |
 | `userId` | String (FK) | Dono do filme |
 
 ### `drawn_movies`
