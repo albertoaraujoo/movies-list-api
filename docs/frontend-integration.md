@@ -76,7 +76,8 @@ Todas as rotas de filmes exigem: `Authorization: Bearer {accessToken}`.
 |--------|------|----------------|
 | POST | `/movies/draw` | Sortear um filme aleatório (não assistido e não já sorteado). Limite de 30 itens na lista. |
 | GET | `/movies/drawn` | Listar a fila de sorteados ordenada. |
-| POST | `/movies/drawn` | Adicionar um filme à lista de sorteados manualmente. Body: `{ movieId: string }`. Limite de 30 itens. |
+| POST | `/movies/drawn/from-tmdb` | Criar filme via TMDB e adicionar à lista de sorteados. Body: como POST /movies (`title`, `tmdbId?`, `year?`). Limite de 30 itens. |
+| POST | `/movies/drawn` | Adicionar um filme já existente na sua lista à lista de sorteados. Body: `{ movieId: string }`. Limite de 30 itens. |
 | DELETE | `/movies/drawn/:drawnId` | Remover um item da lista de sorteados pelo ID do registro. |
 
 ---
