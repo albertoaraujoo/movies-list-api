@@ -13,6 +13,7 @@ import { UpdateMovieDto } from './dto/update-movie.dto';
 import { FilterMoviesDto } from './dto/filter-movies.dto';
 
 const DRAWN_LIST_MAX_SIZE = 30;
+const TMDB_LOGO_BASE_URL = 'https://image.tmdb.org/t/p/w92';
 
 export interface PaginatedMovies {
   data: Movie[];
@@ -37,6 +38,32 @@ export class MoviesService {
     private readonly tmdbService: TmdbService,
   ) {}
 
+  /**
+   * Enriquece watchProvidersBr com logoUrl (URL completa) em cada provider para exibição no frontend.
+   */
+  private withProviderLogoUrls<T extends { watchProvidersBr?: Prisma.JsonValue | null }>(item: T): T {
+    const raw = item.watchProvidersBr as Record<string, unknown> | null | undefined;
+    if (!raw || typeof raw !== 'object') return item;
+
+    const enrich = (arr: unknown[] | undefined) =>
+      Array.isArray(arr)
+        ? arr.map((p) => {
+            const provider = p as Record<string, unknown>;
+            const path = provider?.logo_path as string | undefined;
+            return { ...provider, logoUrl: path ? `${TMDB_LOGO_BASE_URL}${path}` : undefined };
+          })
+        : undefined;
+
+    const watchProvidersBr = {
+      ...raw,
+      flatrate: enrich(raw.flatrate as unknown[] | undefined),
+      rent: enrich(raw.rent as unknown[] | undefined),
+      buy: enrich(raw.buy as unknown[] | undefined),
+    };
+
+    return { ...item, watchProvidersBr };
+  }
+
   async create(userId: string, createMovieDto: CreateMovieDto): Promise<Movie> {
     const { title, year, tmdbId: providedTmdbId, ...rest } = createMovieDto;
 
@@ -54,7 +81,7 @@ export class MoviesService {
           tmdbId: tmdbData.tmdbId,
           overview: tmdbData.overview ?? undefined,
           runtime: tmdbData.runtime ?? undefined,
-          watchProvidersBr: tmdbData.watchProvidersBr ?? undefined,
+          watchProvidersBr: (tmdbData.watchProvidersBr ?? undefined) as Prisma.JsonValue,
         };
       }
     } else {
@@ -67,20 +94,21 @@ export class MoviesService {
           tmdbId: tmdbData.tmdbId,
           overview: tmdbData.overview ?? undefined,
           runtime: tmdbData.runtime ?? undefined,
-          watchProvidersBr: tmdbData.watchProvidersBr ?? undefined,
+          watchProvidersBr: (tmdbData.watchProvidersBr ?? undefined) as Prisma.JsonValue,
         };
       }
     }
 
-    return this.prisma.movie.create({
+    const movie = await this.prisma.movie.create({
       data: {
         title,
         year,
         ...rest,
         ...enrichedData,
         userId,
-      },
+      } as Prisma.MovieUncheckedCreateInput,
     });
+    return this.withProviderLogoUrls(movie);
   }
 
   async findAll(userId: string, filters: FilterMoviesDto): Promise<PaginatedMovies> {
@@ -113,7 +141,7 @@ export class MoviesService {
     ]);
 
     return {
-      data,
+      data: data.map((m) => this.withProviderLogoUrls(m)),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -132,7 +160,7 @@ export class MoviesService {
       throw new ForbiddenException('Acesso negado: este filme pertence a outro usuário');
     }
 
-    return movie;
+    return this.withProviderLogoUrls(movie);
   }
 
   async update(userId: string, movieId: string, updateMovieDto: UpdateMovieDto): Promise<Movie> {
@@ -151,7 +179,7 @@ export class MoviesService {
         );
       }
 
-      return updatedMovie;
+      return this.withProviderLogoUrls(updatedMovie);
     });
   }
 
@@ -188,12 +216,12 @@ export class MoviesService {
         year: movie.year ?? tmdbData.year,
         overview: tmdbData.overview ?? undefined,
         runtime: tmdbData.runtime ?? undefined,
-        watchProvidersBr: tmdbData.watchProvidersBr ?? undefined,
+        watchProvidersBr: (tmdbData.watchProvidersBr ?? undefined) as Prisma.InputJsonValue,
       },
     });
 
     this.logger.log(`Filme "${movie.title}" sincronizado com TMDB ID ${tmdbData.tmdbId}`);
-    return updatedMovie;
+    return this.withProviderLogoUrls(updatedMovie);
   }
 
   async drawMovie(userId: string): Promise<DrawnMovieWithMovie> {
@@ -238,16 +266,17 @@ export class MoviesService {
         `Filme sorteado: "${selectedMovie.title}" (posição ${nextOrder}) para usuário ${userId}`,
       );
 
-      return drawn;
+      return { ...drawn, movie: this.withProviderLogoUrls(drawn.movie) };
     });
   }
 
   async getDrawnList(userId: string): Promise<DrawnMovieWithMovie[]> {
-    return this.prisma.drawnMovie.findMany({
+    const list = await this.prisma.drawnMovie.findMany({
       where: { movie: { userId } },
       include: { movie: true },
       orderBy: { order: 'asc' },
-    }) as Promise<DrawnMovieWithMovie[]>;
+    });
+    return list.map((d) => ({ ...d, movie: this.withProviderLogoUrls(d.movie) })) as DrawnMovieWithMovie[];
   }
 
   async removeFromDrawnList(userId: string, drawnMovieId: string): Promise<void> {

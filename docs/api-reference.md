@@ -68,7 +68,7 @@ Cria um novo filme. Busca automaticamente cartaz, diretor e ano na TMDB.
 | `id`, `title`, `director`, `year`, `notes`, `watched`, `tmdbId`, `posterPath` | — | Campos já existentes |
 | `overview` | string \| null | Sinopse (TMDB) |
 | `runtime` | number \| null | Duração em minutos (TMDB) |
-| `watchProvidersBr` | object \| null | Onde assistir no Brasil: `{ link?, flatrate?, rent?, buy? }`. Cada array tem itens `{ logo_path, provider_id, provider_name, display_priority }`. Dados via JustWatch. |
+| `watchProvidersBr` | object \| null | Onde assistir no Brasil: `{ link?, flatrate?, rent?, buy? }`. Cada array tem itens `{ logo_path, logoUrl, provider_id, provider_name, display_priority }`. `logoUrl` é a URL completa do ícone (TMDB w92). Dados via JustWatch. |
 
 ---
 
