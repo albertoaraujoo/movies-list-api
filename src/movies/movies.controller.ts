@@ -49,6 +49,15 @@ export class MoviesController {
     return this.moviesService.drawMovie(user.id);
   }
 
+  @Post('drawn/from-tmdb')
+  @HttpCode(HttpStatus.CREATED)
+  createMovieAndAddToDrawn(
+    @CurrentUser() user: User,
+    @Body() createMovieDto: CreateMovieDto,
+  ) {
+    return this.moviesService.createMovieAndAddToDrawn(user.id, createMovieDto);
+  }
+
   @Post('drawn')
   @HttpCode(HttpStatus.CREATED)
   addToDrawnList(@CurrentUser() user: User, @Body() body: AddToDrawnDto) {

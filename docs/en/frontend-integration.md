@@ -76,7 +76,8 @@ All movie routes require: `Authorization: Bearer {accessToken}`.
 |--------|-------|----------------|
 | POST | `/movies/draw` | Draw a random movie (unwatched and not already drawn). List capped at 30 items. |
 | GET | `/movies/drawn` | List the drawn queue in order. |
-| POST | `/movies/drawn` | Add a movie to the drawn list manually. Body: `{ movieId: string }`. Limit of 30 items. |
+| POST | `/movies/drawn/from-tmdb` | Create movie via TMDB and add to the drawn list. Body: same as POST /movies (`title`, `tmdbId?`, `year?`). Limit of 30 items. |
+| POST | `/movies/drawn` | Add an existing movie from your list to the drawn list. Body: `{ movieId: string }`. Limit of 30 items. |
 | DELETE | `/movies/drawn/:drawnId` | Remove an item from the drawn list by the record ID. |
 
 ---

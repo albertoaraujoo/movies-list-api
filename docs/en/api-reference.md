@@ -194,8 +194,24 @@ Returns the drawn list ordered by `order` (insertion order).
 
 ---
 
+### `POST /movies/drawn/from-tmdb`
+Creates a movie from TMDB (same body as POST /movies) and adds it directly to the drawn list. Use this to add to the drawn queue without adding to the main list first.
+
+**Body:** same as create movie — `title` required; `tmdbId` or search by title/year.
+```json
+{ "title": "Inception", "tmdbId": 27205 }
+```
+or
+```json
+{ "title": "Inception", "year": 2010 }
+```
+
+**Response `201`:** the created `DrawnMovie` record with `movie` included (movie already enriched by TMDB). Limit of 30 items in the list.
+
+---
+
 ### `POST /movies/drawn`
-Adds a movie to the drawn list manually (e.g. movies drawn before using the app). The movie must belong to the user and must not already be in the list. Limit of 30 items.
+Adds an **existing** movie from the user's list to the drawn list (e.g. movies drawn before using the app). The movie must belong to the user and must not already be in the list. Limit of 30 items.
 
 **Body:**
 ```json

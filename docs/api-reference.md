@@ -194,8 +194,24 @@ Retorna a lista de sorteados ordenada por `order` (ordem de inserção).
 
 ---
 
+### `POST /movies/drawn/from-tmdb`
+Cria um filme a partir da TMDB (mesmo body do POST /movies) e adiciona-o diretamente à lista de sorteados. Útil para incluir na fila de sorteados sem passar pela lista geral.
+
+**Body:** igual ao de criar filme — `title` obrigatório; `tmdbId` ou busca por título/ano.
+```json
+{ "title": "Inception", "tmdbId": 27205 }
+```
+ou
+```json
+{ "title": "Inception", "year": 2010 }
+```
+
+**Response `201`:** o registro `DrawnMovie` criado com `movie` incluído (filme já enriquecido pela TMDB). Limite de 30 itens na lista.
+
+---
+
 ### `POST /movies/drawn`
-Adiciona um filme à lista de sorteados manualmente (ex.: filmes sorteados antes de usar o app). O filme deve ser do usuário e não pode já estar na lista. Limite de 30 itens.
+Adiciona um filme **já existente** na sua lista à lista de sorteados (ex.: filmes sorteados antes de usar o app). O filme deve ser do usuário e não pode já estar na lista. Limite de 30 itens.
 
 **Body:**
 ```json

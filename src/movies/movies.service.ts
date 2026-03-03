@@ -328,6 +328,18 @@ export class MoviesService {
     return { ...drawn, movie: this.withProviderLogoUrls(drawn.movie) } as DrawnMovieWithMovie;
   }
 
+  /**
+   * Cria um filme a partir da TMDB (como POST /movies) e adiciona diretamente à lista de sorteados.
+   * Útil para adicionar à fila de sorteados sem passar pela lista geral primeiro.
+   */
+  async createMovieAndAddToDrawn(
+    userId: string,
+    createMovieDto: CreateMovieDto,
+  ): Promise<DrawnMovieWithMovie> {
+    const movie = await this.create(userId, createMovieDto);
+    return this.addToDrawnList(userId, movie.id);
+  }
+
   async getDrawnList(userId: string): Promise<DrawnMovieWithMovie[]> {
     const list = await this.prisma.drawnMovie.findMany({
       where: { movie: { userId } },
