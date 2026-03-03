@@ -15,6 +15,7 @@
 | `id` | UUID | Primary key |
 | `email` | String (unique) | Google account email |
 | `name` | String | User's name |
+| `image` | String? | Avatar (Google profile photo URL) |
 | `googleId` | String (unique) | Google account ID |
 | `createdAt` | DateTime | Creation date |
 | `updatedAt` | DateTime | Last updated date |
@@ -30,6 +31,9 @@
 | `watched` | Boolean | Whether it was watched (default: `false`) |
 | `tmdbId` | Int? | TMDB movie ID |
 | `posterPath` | String? | Full poster URL |
+| `overview` | String? | Synopsis (TMDB) |
+| `runtime` | Int? | Duration in minutes (TMDB) |
+| `watchProvidersBr` | Json? | Where to watch in Brazil: flatrate, rent, buy (JustWatch) |
 | `userId` | String (FK) | Movie owner |
 
 ### `drawn_movies`

@@ -47,7 +47,8 @@ Não requer autenticação prévia.
     "user": {
       "id": "uuid",
       "email": "usuario@gmail.com",
-      "name": "Nome do Usuário"
+      "name": "Nome do Usuário",
+      "image": "https://lh3.googleusercontent.com/..."
     }
   },
   "timestamp": "2026-03-02T19:00:00.000Z",

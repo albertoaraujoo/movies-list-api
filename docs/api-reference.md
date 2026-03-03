@@ -43,6 +43,37 @@ Autentica via Google e retorna um JWT da aplicação.
 
 ---
 
+## Perfil do usuário
+
+Todas as rotas de `/users` exigem: `Authorization: Bearer {accessToken}`.
+
+### `GET /users/profile`
+Retorna dados do usuário autenticado e estatísticas da lista de filmes.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "id": "uuid",
+    "name": "Nome do Usuário",
+    "email": "usuario@gmail.com",
+    "image": "https://lh3.googleusercontent.com/...",
+    "totalMovies": 42,
+    "watchedMovies": 17
+  },
+  "timestamp": "...",
+  "path": "/api/v1/users/profile"
+}
+```
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id`, `name`, `email`, `image` | — | Dados básicos (avatar do Google em `image`) |
+| `totalMovies` | number | Total de filmes na lista do usuário |
+| `watchedMovies` | number | Quantidade de filmes com `watched === true` |
+
+---
+
 ## Filmes
 
 ### `POST /movies`
@@ -130,14 +161,14 @@ Remove o filme permanentemente (cascade apaga o registro em `DrawnMovie`).
 ---
 
 ### `POST /movies/:id/sync-tmdb`
-Sincroniza manualmente os dados do filme com a TMDB (cartaz, diretor, ano).
+Sincroniza manualmente os dados do filme com a TMDB (cartaz, diretor, ano, sinopse, duração, onde assistir no Brasil).
 
 **Body (opcional):**
 ```json
 { "tmdbId": 27205 }
 ```
 
-> Se `tmdbId` não for informado, busca pelo título do filme cadastrado.
+> Se `tmdbId` não for informado, busca pelo título do filme cadastrado. Atualiza `overview`, `runtime` e `watchProvidersBr`.
 
 ---
 

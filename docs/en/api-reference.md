@@ -43,10 +43,41 @@ Authenticates via Google and returns an application JWT.
 
 ---
 
+## User profile
+
+All `/users` routes require: `Authorization: Bearer {accessToken}`.
+
+### `GET /users/profile`
+Returns the authenticated user's data and movie list statistics.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "id": "uuid",
+    "name": "User Name",
+    "email": "user@gmail.com",
+    "image": "https://lh3.googleusercontent.com/...",
+    "totalMovies": 42,
+    "watchedMovies": 17
+  },
+  "timestamp": "...",
+  "path": "/api/v1/users/profile"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id`, `name`, `email`, `image` | — | Basic data (Google avatar in `image`) |
+| `totalMovies` | number | Total movies in the user's list |
+| `watchedMovies` | number | Count of movies with `watched === true` |
+
+---
+
 ## Movies
 
 ### `POST /movies`
-Creates a new movie. Automatically fetches poster, director and year from TMDB.
+Creates a new movie. Automatically fetches poster, director, year, overview, runtime and watch providers (Brazil) from TMDB.
 
 ```json
 {
@@ -57,7 +88,18 @@ Creates a new movie. Automatically fetches poster, director and year from TMDB.
 ```
 
 > `tmdbId` is optional. If provided, uses that specific TMDB ID. Otherwise, searches by title.
-> `director`, `year` and `posterPath` are automatically populated via TMDB.
+> API enriches via TMDB: `director`, `year`, `posterPath`, `overview`, `runtime`, `watchProvidersBr` (where to watch/rent in Brazil).
+
+---
+
+### Movie object (GET /movies and GET /movies/:id)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id`, `title`, `director`, `year`, `notes`, `watched`, `tmdbId`, `posterPath` | — | Existing fields |
+| `overview` | string \| null | Synopsis (TMDB) |
+| `runtime` | number \| null | Duration in minutes (TMDB) |
+| `watchProvidersBr` | object \| null | Where to watch in Brazil: `{ link?, flatrate?, rent?, buy? }`. Each array has items `{ logo_path, logoUrl, provider_id, provider_name, display_priority }`. `logoUrl` is the full icon URL (TMDB w92). Data via JustWatch. |
 
 ---
 
@@ -119,14 +161,14 @@ Permanently removes the movie (cascade deletes the `DrawnMovie` record).
 ---
 
 ### `POST /movies/:id/sync-tmdb`
-Manually syncs the movie data with TMDB (poster, director, year).
+Manually syncs the movie data with TMDB (poster, director, year, overview, runtime, where to watch in Brazil).
 
 **Body (optional):**
 ```json
 { "tmdbId": 27205 }
 ```
 
-> If `tmdbId` is not provided, searches by the movie's existing title.
+> If `tmdbId` is not provided, searches by the movie's existing title. Updates `overview`, `runtime` and `watchProvidersBr`.
 
 ---
 

@@ -22,7 +22,7 @@ Este documento resume o projeto da API e como a documentação foi organizada, p
    - **Body:** `{ "idToken": "eyJhbGciOiJSUzI1NiIs..." }`
 4. Backend valida o idToken com o Google, cria ou atualiza o usuário no banco e devolve:
    - **accessToken** (JWT da aplicação)
-   - **user** `{ id, email, name }`
+   - **user** `{ id, email, name, image }` (avatar do Google em `image`)
 5. Frontend armazena o **accessToken** (ex.: cookie httpOnly, localStorage ou estado) e envia em **todas** as requisições às rotas protegidas:
    - **Header:** `Authorization: Bearer {accessToken}`
 
@@ -53,18 +53,24 @@ Todas as rotas de filmes exigem: `Authorization: Bearer {accessToken}`.
 |--------|------|------|----------------|
 | POST | `/auth/google` | `{ idToken: string }` | Chamar após o usuário fazer login com Google; guardar `data.accessToken` e `data.user`. |
 
-### 4.2 Filmes (autenticado)
+### 4.2 Perfil do usuário (autenticado)
+
+| Método | Rota | Uso no front |
+|--------|------|----------------|
+| GET | `/users/profile` | Dados do usuário + estatísticas: `{ id, name, email, image, totalMovies, watchedMovies }`. |
+
+### 4.3 Filmes (autenticado)
 
 | Método | Rota | Uso no front |
 |--------|------|----------------|
 | GET | `/movies` | Listar filmes. Query params: `search`, `watched`, `year`, `director`, `page`, `limit`. |
-| POST | `/movies` | Criar filme. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriquece com TMDB (cartaz, diretor, ano). |
-| GET | `/movies/:id` | Detalhe de um filme. |
+| POST | `/movies` | Criar filme. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriquece com TMDB (cartaz, diretor, ano, sinopse, duração, onde assistir no BR). |
+| GET | `/movies/:id` | Detalhe de um filme (inclui `overview`, `runtime`, `watchProvidersBr` com `logoUrl` por provider). |
 | PATCH | `/movies/:id` | Atualizar (ex.: `watched`, `notes`). Marcar `watched: true` remove o filme da lista de sorteados. |
 | DELETE | `/movies/:id` | Remover filme. |
-| POST | `/movies/:id/sync-tmdb` | Re-sincronizar dados do filme com a TMDB. Body opcional: `{ tmdbId? }`. |
+| POST | `/movies/:id/sync-tmdb` | Re-sincronizar dados do filme com a TMDB (atualiza também sinopse, duração, onde assistir). Body opcional: `{ tmdbId? }`. |
 
-### 4.3 Lista de sorteados (autenticado)
+### 4.4 Lista de sorteados (autenticado)
 
 | Método | Rota | Uso no front |
 |--------|------|----------------|
@@ -88,10 +94,14 @@ Exemplos de status: 200, 201, 204 (sucesso); 400 (validação/regra de negócio)
 Para tipagem e UI no Next.js:
 
 **User (retornado no login)**  
-`{ id: string, email: string, name: string }`
+`{ id: string, email: string, name: string, image: string | null }`
+
+**Perfil (GET /users/profile)**  
+`{ id, name, email, image, totalMovies: number, watchedMovies: number }`
 
 **Movie**  
-`id`, `title`, `director?`, `year?`, `notes?`, `watched`, `tmdbId?`, `posterPath?`, `userId`, `createdAt`, `updatedAt`, e opcionalmente `drawn?: { id, order, drawnAt }`
+`id`, `title`, `director?`, `year?`, `notes?`, `watched`, `tmdbId?`, `posterPath?`, `overview?`, `runtime?`, `watchProvidersBr?`, `userId`, `createdAt`, `updatedAt`, e opcionalmente `drawn?: { id, order, drawnAt }`.  
+Em `watchProvidersBr`: `{ link?, flatrate?, rent?, buy? }`; cada array tem itens com `logo_path`, `logoUrl` (URL do ícone), `provider_id`, `provider_name`, `display_priority`.
 
 **Listagem paginada (GET /movies)**  
 `{ data: Movie[], meta: { total, page, limit, totalPages } }`
@@ -100,6 +110,8 @@ Para tipagem e UI no Next.js:
 `id`, `movieId`, `order`, `drawnAt`, `movie: Movie`
 
 **Cartaz:** o campo `posterPath` já vem com URL completa (ex.: `https://image.tmdb.org/t/p/w500/...`). Exibir com `<img src={movie.posterPath} />`.
+
+**Ícones dos streamings:** em `watchProvidersBr.flatrate`, `rent` e `buy`, cada provider tem `logoUrl` (URL pronta). Use `<img src={provider.logoUrl} alt={provider.provider_name} />`.
 
 ---
 
@@ -165,10 +177,12 @@ Exemplo de tabela no README (igual ao da API):
 
 - [ ] Variável `NEXT_PUBLIC_API_URL` apontando para o backend (dev e prod).
 - [ ] Variável `NEXT_PUBLIC_GOOGLE_CLIENT_ID` para o botão de login com Google.
-- [ ] Tela de login: obter idToken do Google → POST `/auth/google` → guardar accessToken e user.
-- [ ] Enviar `Authorization: Bearer {accessToken}` em todas as requisições às rotas `/movies`.
+- [ ] Tela de login: obter idToken do Google → POST `/auth/google` → guardar accessToken e user (inclui `image`).
+- [ ] Enviar `Authorization: Bearer {accessToken}` em todas as requisições às rotas `/movies` e `/users`.
+- [ ] Perfil: GET `/users/profile` para exibir nome, avatar, total de filmes e assistidos.
 - [ ] Tratar resposta no formato `{ data, timestamp, path }` e erros no formato `{ statusCode, message, path }`.
 - [ ] Listagem de filmes com filtros (search, watched, paginação) e exibição de `posterPath`.
+- [ ] Página do filme: sinopse (`overview`), duração (`runtime`), onde assistir no Brasil (`watchProvidersBr` com ícones via `logoUrl`).
 - [ ] CRUD de filmes (criar, editar, marcar assistido, excluir).
 - [ ] Fluxo de sorteio: POST `/movies/draw`, GET `/movies/drawn`, DELETE `/movies/drawn/:drawnId`.
 - [ ] Em produção: backend com `FRONTEND_URL` igual à URL do front; CORS ok.

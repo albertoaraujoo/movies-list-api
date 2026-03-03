@@ -22,7 +22,7 @@ This document summarizes the API project and how its documentation is organized,
    - **Body:** `{ "idToken": "eyJhbGciOiJSUzI1NiIs..." }`
 4. Backend validates the idToken with Google, creates or updates the user in the DB, and returns:
    - **accessToken** (application JWT)
-   - **user** `{ id, email, name }`
+   - **user** `{ id, email, name, image }` (Google avatar in `image`)
 5. Frontend stores the **accessToken** (e.g. httpOnly cookie, localStorage, or state) and sends it on **every** request to protected routes:
    - **Header:** `Authorization: Bearer {accessToken}`
 
@@ -53,18 +53,24 @@ All movie routes require: `Authorization: Bearer {accessToken}`.
 |--------|-------|------|----------------|
 | POST | `/auth/google` | `{ idToken: string }` | Call after user signs in with Google; store `data.accessToken` and `data.user`. |
 
-### 4.2 Movies (authenticated)
+### 4.2 User profile (authenticated)
+
+| Method | Route | Frontend usage |
+|--------|-------|----------------|
+| GET | `/users/profile` | User data + stats: `{ id, name, email, image, totalMovies, watchedMovies }`. |
+
+### 4.3 Movies (authenticated)
 
 | Method | Route | Frontend usage |
 |--------|-------|----------------|
 | GET | `/movies` | List movies. Query params: `search`, `watched`, `year`, `director`, `page`, `limit`. |
-| POST | `/movies` | Create movie. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriches with TMDB (poster, director, year). |
-| GET | `/movies/:id` | Movie details. |
+| POST | `/movies` | Create movie. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriches with TMDB (poster, director, year, overview, runtime, where to watch in BR). |
+| GET | `/movies/:id` | Movie details (includes `overview`, `runtime`, `watchProvidersBr` with `logoUrl` per provider). |
 | PATCH | `/movies/:id` | Update (e.g. `watched`, `notes`). Setting `watched: true` removes the movie from the drawn list. |
 | DELETE | `/movies/:id` | Delete movie. |
-| POST | `/movies/:id/sync-tmdb` | Re-sync movie data with TMDB. Optional body: `{ tmdbId? }`. |
+| POST | `/movies/:id/sync-tmdb` | Re-sync movie data with TMDB (also updates overview, runtime, where to watch). Optional body: `{ tmdbId? }`. |
 
-### 4.3 Drawn list (authenticated)
+### 4.4 Drawn list (authenticated)
 
 | Method | Route | Frontend usage |
 |--------|-------|----------------|
@@ -88,10 +94,14 @@ Status codes: 200, 201, 204 (success); 400 (validation/business rule); 401 (unau
 For typing and UI in Next.js:
 
 **User (returned on login)**  
-`{ id: string, email: string, name: string }`
+`{ id: string, email: string, name: string, image: string | null }`
+
+**Profile (GET /users/profile)**  
+`{ id, name, email, image, totalMovies: number, watchedMovies: number }`
 
 **Movie**  
-`id`, `title`, `director?`, `year?`, `notes?`, `watched`, `tmdbId?`, `posterPath?`, `userId`, `createdAt`, `updatedAt`, and optionally `drawn?: { id, order, drawnAt }`
+`id`, `title`, `director?`, `year?`, `notes?`, `watched`, `tmdbId?`, `posterPath?`, `overview?`, `runtime?`, `watchProvidersBr?`, `userId`, `createdAt`, `updatedAt`, and optionally `drawn?: { id, order, drawnAt }`.  
+In `watchProvidersBr`: `{ link?, flatrate?, rent?, buy? }`; each array has items with `logo_path`, `logoUrl` (icon URL), `provider_id`, `provider_name`, `display_priority`.
 
 **Paginated list (GET /movies)**  
 `{ data: Movie[], meta: { total, page, limit, totalPages } }`
@@ -100,6 +110,8 @@ For typing and UI in Next.js:
 `id`, `movieId`, `order`, `drawnAt`, `movie: Movie`
 
 **Poster:** the `posterPath` field is already a full URL (e.g. `https://image.tmdb.org/t/p/w500/...`). Use `<img src={movie.posterPath} />`.
+
+**Streaming icons:** in `watchProvidersBr.flatrate`, `rent` and `buy`, each provider has `logoUrl` (ready-to-use URL). Use `<img src={provider.logoUrl} alt={provider.provider_name} />`.
 
 ---
 
@@ -165,10 +177,12 @@ Example table (same idea as the API):
 
 - [ ] `NEXT_PUBLIC_API_URL` pointing to the backend (dev and prod).
 - [ ] `NEXT_PUBLIC_GOOGLE_CLIENT_ID` for the Google sign-in button.
-- [ ] Login screen: get Google idToken → POST `/auth/google` → store accessToken and user.
-- [ ] Send `Authorization: Bearer {accessToken}` on every request to `/movies` routes.
+- [ ] Login screen: get Google idToken → POST `/auth/google` → store accessToken and user (includes `image`).
+- [ ] Send `Authorization: Bearer {accessToken}` on every request to `/movies` and `/users` routes.
+- [ ] Profile: GET `/users/profile` to show name, avatar, total movies and watched count.
 - [ ] Handle response shape `{ data, timestamp, path }` and errors `{ statusCode, message, path }`.
 - [ ] Movie list with filters (search, watched, pagination) and `posterPath` display.
+- [ ] Movie detail page: synopsis (`overview`), runtime (`runtime`), where to watch in Brazil (`watchProvidersBr` with icons via `logoUrl`).
 - [ ] Movie CRUD (create, edit, mark watched, delete).
 - [ ] Draw flow: POST `/movies/draw`, GET `/movies/drawn`, DELETE `/movies/drawn/:drawnId`.
 - [ ] In production: backend `FRONTEND_URL` set to the frontend URL; CORS correct.

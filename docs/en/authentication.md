@@ -47,7 +47,8 @@ No prior authentication required.
     "user": {
       "id": "uuid",
       "email": "user@gmail.com",
-      "name": "User Name"
+      "name": "User Name",
+      "image": "https://lh3.googleusercontent.com/..."
     }
   },
   "timestamp": "2026-03-02T19:00:00.000Z",

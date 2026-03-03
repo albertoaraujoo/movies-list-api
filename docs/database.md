@@ -15,6 +15,7 @@
 | `id` | UUID | Chave primária |
 | `email` | String (único) | Email da conta Google |
 | `name` | String | Nome do usuário |
+| `image` | String? | Avatar (URL da foto do Google) |
 | `googleId` | String (único) | ID da conta Google |
 | `createdAt` | DateTime | Data de criação |
 | `updatedAt` | DateTime | Data de atualização |
@@ -30,6 +31,9 @@
 | `watched` | Boolean | Se foi assistido (padrão: `false`) |
 | `tmdbId` | Int? | ID do filme na TMDB |
 | `posterPath` | String? | URL completa do cartaz |
+| `overview` | String? | Sinopse (TMDB) |
+| `runtime` | Int? | Duração em minutos (TMDB) |
+| `watchProvidersBr` | Json? | Onde assistir no Brasil: flatrate, rent, buy (JustWatch) |
 | `userId` | String (FK) | Dono do filme |
 
 ### `drawn_movies`
