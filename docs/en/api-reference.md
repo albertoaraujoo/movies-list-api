@@ -99,6 +99,7 @@ Creates a new movie. Automatically fetches poster, director, year, overview, run
 | `id`, `title`, `director`, `year`, `notes`, `watched`, `tmdbId`, `posterPath` | — | Existing fields |
 | `overview` | string \| null | Synopsis (TMDB) |
 | `runtime` | number \| null | Duration in minutes (TMDB) |
+| `userRating` | number \| null | User rating (0 to 10 in 0.5 steps: 0, 0.5, 1, … 10). Optional; commonly used for watched movies. |
 | `watchProvidersBr` | object \| null | Where to watch in Brazil: `{ link?, flatrate?, rent?, buy? }`. Each array has items `{ logo_path, logoUrl, provider_id, provider_name, display_priority }`. `logoUrl` is the full icon URL (TMDB w92). Data via JustWatch. |
 
 ---
@@ -119,7 +120,8 @@ Lists the user's movies with filters and pagination.
 
 **Example:** `GET /movies?search=batman&watched=false&page=1&limit=10`
 
-**Response:**
+**Response:** In addition to the paginated list and meta, the response includes two extra arrays: `watched` (all user's watched movies) and `unwatched` (all unwatched).
+
 ```json
 {
   "data": {
@@ -129,7 +131,9 @@ Lists the user's movies with filters and pagination.
       "page": 1,
       "limit": 10,
       "totalPages": 5
-    }
+    },
+    "watched": [ { ...movie } ],
+    "unwatched": [ { ...movie } ]
   }
 }
 ```
@@ -142,12 +146,13 @@ Returns a specific movie. Returns `403` if the movie belongs to another user.
 ---
 
 ### `PATCH /movies/:id`
-Updates a movie. All fields are optional.
+Updates a movie. All fields are optional. Includes `userRating` (0 to 10 in 0.5 steps).
 
 ```json
 {
   "watched": true,
-  "notes": "Watched in March 2026"
+  "notes": "Watched in March 2026",
+  "userRating": 8.5
 }
 ```
 
@@ -189,8 +194,20 @@ Returns the drawn list ordered by `order` (insertion order).
 
 ---
 
+### `POST /movies/drawn`
+Adds a movie to the drawn list manually (e.g. movies drawn before using the app). The movie must belong to the user and must not already be in the list. Limit of 30 items.
+
+**Body:**
+```json
+{ "movieId": "movie-uuid" }
+```
+
+**Response `201`:** the created `DrawnMovie` record with `movie` included.
+
+---
+
 ### `DELETE /movies/drawn/:drawnId`
-Removes an item from the drawn list by its `DrawnMovie` record ID.
+Removes an item from the drawn list by the `DrawnMovie` record ID (`drawnId`).
 
 ---
 

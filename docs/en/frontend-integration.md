@@ -66,7 +66,7 @@ All movie routes require: `Authorization: Bearer {accessToken}`.
 | GET | `/movies` | List movies. Query params: `search`, `watched`, `year`, `director`, `page`, `limit`. |
 | POST | `/movies` | Create movie. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriches with TMDB (poster, director, year, overview, runtime, where to watch in BR). |
 | GET | `/movies/:id` | Movie details (includes `overview`, `runtime`, `watchProvidersBr` with `logoUrl` per provider). |
-| PATCH | `/movies/:id` | Update (e.g. `watched`, `notes`). Setting `watched: true` removes the movie from the drawn list. |
+| PATCH | `/movies/:id` | Update (e.g. `watched`, `notes`, `userRating` 0–10 in 0.5 steps). Setting `watched: true` removes the movie from the drawn list. |
 | DELETE | `/movies/:id` | Delete movie. |
 | POST | `/movies/:id/sync-tmdb` | Re-sync movie data with TMDB (also updates overview, runtime, where to watch). Optional body: `{ tmdbId? }`. |
 
@@ -76,7 +76,8 @@ All movie routes require: `Authorization: Bearer {accessToken}`.
 |--------|-------|----------------|
 | POST | `/movies/draw` | Draw a random movie (unwatched and not already drawn). List capped at 30 items. |
 | GET | `/movies/drawn` | List the drawn queue in order. |
-| DELETE | `/movies/drawn/:drawnId` | Remove an item from the drawn list. |
+| POST | `/movies/drawn` | Add a movie to the drawn list manually. Body: `{ movieId: string }`. Limit of 30 items. |
+| DELETE | `/movies/drawn/:drawnId` | Remove an item from the drawn list by the record ID. |
 
 ---
 
@@ -100,11 +101,11 @@ For typing and UI in Next.js:
 `{ id, name, email, image, totalMovies: number, watchedMovies: number }`
 
 **Movie**  
-`id`, `title`, `director?`, `year?`, `notes?`, `watched`, `tmdbId?`, `posterPath?`, `overview?`, `runtime?`, `watchProvidersBr?`, `userId`, `createdAt`, `updatedAt`, and optionally `drawn?: { id, order, drawnAt }`.  
+`id`, `title`, `director?`, `year?`, `notes?`, `watched`, `tmdbId?`, `posterPath?`, `overview?`, `runtime?`, `userRating?` (0 to 10 in 0.5 steps), `watchProvidersBr?`, `userId`, `createdAt`, `updatedAt`, and optionally `drawn?: { id, order, drawnAt }`.  
 In `watchProvidersBr`: `{ link?, flatrate?, rent?, buy? }`; each array has items with `logo_path`, `logoUrl` (icon URL), `provider_id`, `provider_name`, `display_priority`.
 
-**Paginated list (GET /movies)**  
-`{ data: Movie[], meta: { total, page, limit, totalPages } }`
+**List (GET /movies)**  
+`{ data: Movie[], meta: { total, page, limit, totalPages }, watched: Movie[], unwatched: Movie[] }` — paginated list in `data` (with filters) plus full `watched` (watched) and `unwatched` (unwatched) arrays.
 
 **DrawnMovie (drawn list item)**  
 `id`, `movieId`, `order`, `drawnAt`, `movie: Movie`

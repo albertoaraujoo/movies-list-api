@@ -66,7 +66,7 @@ Todas as rotas de filmes exigem: `Authorization: Bearer {accessToken}`.
 | GET | `/movies` | Listar filmes. Query params: `search`, `watched`, `year`, `director`, `page`, `limit`. |
 | POST | `/movies` | Criar filme. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriquece com TMDB (cartaz, diretor, ano, sinopse, duração, onde assistir no BR). |
 | GET | `/movies/:id` | Detalhe de um filme (inclui `overview`, `runtime`, `watchProvidersBr` com `logoUrl` por provider). |
-| PATCH | `/movies/:id` | Atualizar (ex.: `watched`, `notes`). Marcar `watched: true` remove o filme da lista de sorteados. |
+| PATCH | `/movies/:id` | Atualizar (ex.: `watched`, `notes`, `userRating` 0–10 em 0,5). Marcar `watched: true` remove o filme da lista de sorteados. |
 | DELETE | `/movies/:id` | Remover filme. |
 | POST | `/movies/:id/sync-tmdb` | Re-sincronizar dados do filme com a TMDB (atualiza também sinopse, duração, onde assistir). Body opcional: `{ tmdbId? }`. |
 
@@ -76,7 +76,8 @@ Todas as rotas de filmes exigem: `Authorization: Bearer {accessToken}`.
 |--------|------|----------------|
 | POST | `/movies/draw` | Sortear um filme aleatório (não assistido e não já sorteado). Limite de 30 itens na lista. |
 | GET | `/movies/drawn` | Listar a fila de sorteados ordenada. |
-| DELETE | `/movies/drawn/:drawnId` | Remover um item da lista de sorteados. |
+| POST | `/movies/drawn` | Adicionar um filme à lista de sorteados manualmente. Body: `{ movieId: string }`. Limite de 30 itens. |
+| DELETE | `/movies/drawn/:drawnId` | Remover um item da lista de sorteados pelo ID do registro. |
 
 ---
 
@@ -100,11 +101,11 @@ Para tipagem e UI no Next.js:
 `{ id, name, email, image, totalMovies: number, watchedMovies: number }`
 
 **Movie**  
-`id`, `title`, `director?`, `year?`, `notes?`, `watched`, `tmdbId?`, `posterPath?`, `overview?`, `runtime?`, `watchProvidersBr?`, `userId`, `createdAt`, `updatedAt`, e opcionalmente `drawn?: { id, order, drawnAt }`.  
+`id`, `title`, `director?`, `year?`, `notes?`, `watched`, `tmdbId?`, `posterPath?`, `overview?`, `runtime?`, `userRating?` (0 a 10 em 0,5), `watchProvidersBr?`, `userId`, `createdAt`, `updatedAt`, e opcionalmente `drawn?: { id, order, drawnAt }`.  
 Em `watchProvidersBr`: `{ link?, flatrate?, rent?, buy? }`; cada array tem itens com `logo_path`, `logoUrl` (URL do ícone), `provider_id`, `provider_name`, `display_priority`.
 
-**Listagem paginada (GET /movies)**  
-`{ data: Movie[], meta: { total, page, limit, totalPages } }`
+**Listagem (GET /movies)**  
+`{ data: Movie[], meta: { total, page, limit, totalPages }, watched: Movie[], unwatched: Movie[] }` — lista paginada em `data` (com filtros) e listas completas `watched` (assistidos) e `unwatched` (não assistidos).
 
 **DrawnMovie (item da lista de sorteados)**  
 `id`, `movieId`, `order`, `drawnAt`, `movie: Movie`

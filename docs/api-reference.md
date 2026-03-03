@@ -99,6 +99,7 @@ Cria um novo filme. Busca automaticamente cartaz, diretor e ano na TMDB.
 | `id`, `title`, `director`, `year`, `notes`, `watched`, `tmdbId`, `posterPath` | — | Campos já existentes |
 | `overview` | string \| null | Sinopse (TMDB) |
 | `runtime` | number \| null | Duração em minutos (TMDB) |
+| `userRating` | number \| null | Nota do usuário (0 a 10 em intervalos de 0,5: 0, 0.5, 1, … 10). Opcional; comum em filmes assistidos. |
 | `watchProvidersBr` | object \| null | Onde assistir no Brasil: `{ link?, flatrate?, rent?, buy? }`. Cada array tem itens `{ logo_path, logoUrl, provider_id, provider_name, display_priority }`. `logoUrl` é a URL completa do ícone (TMDB w92). Dados via JustWatch. |
 
 ---
@@ -119,7 +120,8 @@ Lista os filmes do usuário com filtros e paginação.
 
 **Exemplo:** `GET /movies?search=batman&watched=false&page=1&limit=10`
 
-**Response:**
+**Response:** Além da lista paginada e da meta, a resposta inclui duas listas adicionais: `watched` (todos os filmes assistidos do usuário) e `unwatched` (todos os não assistidos).
+
 ```json
 {
   "data": {
@@ -129,7 +131,9 @@ Lista os filmes do usuário com filtros e paginação.
       "page": 1,
       "limit": 10,
       "totalPages": 5
-    }
+    },
+    "watched": [ { ...movie } ],
+    "unwatched": [ { ...movie } ]
   }
 }
 ```
@@ -142,12 +146,13 @@ Retorna um filme específico. Retorna `403` se o filme pertence a outro usuário
 ---
 
 ### `PATCH /movies/:id`
-Atualiza um filme. Todos os campos são opcionais.
+Atualiza um filme. Todos os campos são opcionais. Inclui `userRating` (0 a 10 em passos de 0,5).
 
 ```json
 {
   "watched": true,
-  "notes": "Assistido em março de 2026"
+  "notes": "Assistido em março de 2026",
+  "userRating": 8.5
 }
 ```
 
@@ -189,8 +194,20 @@ Retorna a lista de sorteados ordenada por `order` (ordem de inserção).
 
 ---
 
+### `POST /movies/drawn`
+Adiciona um filme à lista de sorteados manualmente (ex.: filmes sorteados antes de usar o app). O filme deve ser do usuário e não pode já estar na lista. Limite de 30 itens.
+
+**Body:**
+```json
+{ "movieId": "uuid-do-filme" }
+```
+
+**Response `201`:** o registro `DrawnMovie` criado com `movie` incluído.
+
+---
+
 ### `DELETE /movies/drawn/:drawnId`
-Remove um item da lista de sorteados pelo ID do registro `DrawnMovie`.
+Remove um item da lista de sorteados pelo ID do registro `DrawnMovie` (`drawnId`).
 
 ---
 

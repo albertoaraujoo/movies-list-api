@@ -17,6 +17,7 @@ import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { FilterMoviesDto } from './dto/filter-movies.dto';
 import { SyncTmdbDto } from './dto/sync-tmdb.dto';
+import { AddToDrawnDto } from './dto/add-to-drawn.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
@@ -46,6 +47,12 @@ export class MoviesController {
   @HttpCode(HttpStatus.CREATED)
   drawMovie(@CurrentUser() user: User) {
     return this.moviesService.drawMovie(user.id);
+  }
+
+  @Post('drawn')
+  @HttpCode(HttpStatus.CREATED)
+  addToDrawnList(@CurrentUser() user: User, @Body() body: AddToDrawnDto) {
+    return this.moviesService.addToDrawnList(user.id, body.movieId);
   }
 
   @Get(':id')
