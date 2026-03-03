@@ -57,7 +57,18 @@ Cria um novo filme. Busca automaticamente cartaz, diretor e ano na TMDB.
 ```
 
 > `tmdbId` é opcional. Se informado, usa esse ID específico da TMDB. Caso contrário, busca pelo título.
-> `director`, `year` e `posterPath` são preenchidos automaticamente via TMDB.
+> A API enriquece via TMDB: `director`, `year`, `posterPath`, `overview`, `runtime` e `watchProvidersBr` (onde assistir/alugar no Brasil).
+
+---
+
+### Objeto Movie (resposta de GET /movies e GET /movies/:id)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id`, `title`, `director`, `year`, `notes`, `watched`, `tmdbId`, `posterPath` | — | Campos já existentes |
+| `overview` | string \| null | Sinopse (TMDB) |
+| `runtime` | number \| null | Duração em minutos (TMDB) |
+| `watchProvidersBr` | object \| null | Onde assistir no Brasil: `{ link?, flatrate?, rent?, buy? }`. Cada array tem itens `{ logo_path, provider_id, provider_name, display_priority }`. Dados via JustWatch. |
 
 ---
 

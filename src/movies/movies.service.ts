@@ -40,7 +40,9 @@ export class MoviesService {
   async create(userId: string, createMovieDto: CreateMovieDto): Promise<Movie> {
     const { title, year, tmdbId: providedTmdbId, ...rest } = createMovieDto;
 
-    let enrichedData: Partial<Pick<Movie, 'director' | 'year' | 'posterPath' | 'tmdbId'>> = {};
+    let enrichedData: Partial<
+      Pick<Movie, 'director' | 'year' | 'posterPath' | 'tmdbId' | 'overview' | 'runtime' | 'watchProvidersBr'>
+    > = {};
 
     if (providedTmdbId) {
       const tmdbData = await this.tmdbService.getMovieDetails(providedTmdbId);
@@ -50,6 +52,9 @@ export class MoviesService {
           year: tmdbData.year ?? undefined,
           posterPath: tmdbData.posterPath ?? undefined,
           tmdbId: tmdbData.tmdbId,
+          overview: tmdbData.overview ?? undefined,
+          runtime: tmdbData.runtime ?? undefined,
+          watchProvidersBr: tmdbData.watchProvidersBr ?? undefined,
         };
       }
     } else {
@@ -60,6 +65,9 @@ export class MoviesService {
           year: year ?? tmdbData.year ?? undefined,
           posterPath: tmdbData.posterPath ?? undefined,
           tmdbId: tmdbData.tmdbId,
+          overview: tmdbData.overview ?? undefined,
+          runtime: tmdbData.runtime ?? undefined,
+          watchProvidersBr: tmdbData.watchProvidersBr ?? undefined,
         };
       }
     }
@@ -178,6 +186,9 @@ export class MoviesService {
         posterPath: tmdbData.posterPath,
         director: movie.director ?? tmdbData.director,
         year: movie.year ?? tmdbData.year,
+        overview: tmdbData.overview ?? undefined,
+        runtime: tmdbData.runtime ?? undefined,
+        watchProvidersBr: tmdbData.watchProvidersBr ?? undefined,
       },
     });
 
