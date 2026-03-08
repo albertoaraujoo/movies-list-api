@@ -64,7 +64,8 @@ Todas as rotas de filmes exigem: `Authorization: Bearer {accessToken}`.
 | Método | Rota | Uso no front |
 |--------|------|----------------|
 | GET | `/movies` | Listar filmes. Query params: `search`, `watched`, `year`, `director`, `page`, `limit`. |
-| POST | `/movies` | Criar filme. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriquece com TMDB (cartaz, diretor, ano, sinopse, duração, onde assistir no BR). |
+| POST | `/movies` | Criar filme. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriquece com TMDB. Duplicatas (mesmo tmdbId ou título+ano) retornam `400`. |
+| POST | `/movies/deduplicate` | Varre a lista, encontra duplicatas (por tmdbId ou título+ano) e remove as cópias, mantendo um por grupo. Resposta: `{ removedCount, groups: [{ kept, removed }] }`. |
 | GET | `/movies/:id` | Detalhe de um filme (inclui `overview`, `runtime`, `watchProvidersBr` com `logoUrl` por provider). |
 | PATCH | `/movies/:id` | Atualizar (ex.: `watched`, `notes`, `userRating` 0–10 em 0,5). Marcar `watched: true` remove o filme da lista de sorteados. |
 | DELETE | `/movies/:id` | Remover filme. |
@@ -76,8 +77,8 @@ Todas as rotas de filmes exigem: `Authorization: Bearer {accessToken}`.
 |--------|------|----------------|
 | POST | `/movies/draw` | Sortear um filme aleatório (não assistido e não já sorteado). Limite de 30 itens na lista. |
 | GET | `/movies/drawn` | Listar a fila de sorteados ordenada. |
-| POST | `/movies/drawn/from-tmdb` | Criar filme via TMDB e adicionar à lista de sorteados. Body: como POST /movies (`title`, `tmdbId?`, `year?`). Limite de 30 itens. |
-| POST | `/movies/drawn` | Adicionar um filme já existente na sua lista à lista de sorteados. Body: `{ movieId: string }`. Limite de 30 itens. |
+| POST | `/movies/drawn/from-tmdb` | Criar filme via TMDB e adicionar à lista de sorteados. Se o filme já existir na lista, o existente é adicionado (sem duplicata). Body: como POST /movies. Limite de 30 itens. |
+| POST | `/movies/drawn` | Adicionar um filme já existente na sua lista à lista de sorteados. Body: `{ movieId: string }`. Filme já na lista de sorteados retorna `400`. Limite de 30 itens. |
 | DELETE | `/movies/drawn/:drawnId` | Remover um item da lista de sorteados pelo ID do registro. |
 
 ---

@@ -64,7 +64,8 @@ All movie routes require: `Authorization: Bearer {accessToken}`.
 | Method | Route | Frontend usage |
 |--------|-------|----------------|
 | GET | `/movies` | List movies. Query params: `search`, `watched`, `year`, `director`, `page`, `limit`. |
-| POST | `/movies` | Create movie. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriches with TMDB (poster, director, year, overview, runtime, where to watch in BR). |
+| POST | `/movies` | Create movie. Body: `{ title, notes?, tmdbId?, director?, year?, watched? }`. Backend enriches with TMDB. Duplicates (same tmdbId or title+year) return `400`. |
+| POST | `/movies/deduplicate` | Scan list for duplicates (by tmdbId or title+year) and remove copies, keeping one per group. Response: `{ removedCount, groups: [{ kept, removed }] }`. |
 | GET | `/movies/:id` | Movie details (includes `overview`, `runtime`, `watchProvidersBr` with `logoUrl` per provider). |
 | PATCH | `/movies/:id` | Update (e.g. `watched`, `notes`, `userRating` 0–10 in 0.5 steps). Setting `watched: true` removes the movie from the drawn list. |
 | DELETE | `/movies/:id` | Delete movie. |
@@ -76,8 +77,8 @@ All movie routes require: `Authorization: Bearer {accessToken}`.
 |--------|-------|----------------|
 | POST | `/movies/draw` | Draw a random movie (unwatched and not already drawn). List capped at 30 items. |
 | GET | `/movies/drawn` | List the drawn queue in order. |
-| POST | `/movies/drawn/from-tmdb` | Create movie via TMDB and add to the drawn list. Body: same as POST /movies (`title`, `tmdbId?`, `year?`). Limit of 30 items. |
-| POST | `/movies/drawn` | Add an existing movie from your list to the drawn list. Body: `{ movieId: string }`. Limit of 30 items. |
+| POST | `/movies/drawn/from-tmdb` | Create movie via TMDB and add to the drawn list. If the movie already exists in your list, the existing one is added (no duplicate). Body: same as POST /movies. Limit of 30 items. |
+| POST | `/movies/drawn` | Add an existing movie from your list to the drawn list. Body: `{ movieId: string }`. Movie already in drawn list returns `400`. Limit of 30 items. |
 | DELETE | `/movies/drawn/:drawnId` | Remove an item from the drawn list by the record ID. |
 
 ---

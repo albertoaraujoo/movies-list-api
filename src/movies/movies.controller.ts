@@ -38,6 +38,11 @@ export class MoviesController {
     return this.moviesService.findAll(user.id, filters);
   }
 
+  @Post('deduplicate')
+  deduplicate(@CurrentUser() user: User) {
+    return this.moviesService.deduplicate(user.id);
+  }
+
   @Get('drawn')
   getDrawnList(@CurrentUser() user: User) {
     return this.moviesService.getDrawnList(user.id);
