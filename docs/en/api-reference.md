@@ -89,6 +89,7 @@ Creates a new movie. Automatically fetches poster, director, year, overview, run
 
 > `tmdbId` is optional. If provided, uses that specific TMDB ID. Otherwise, searches by title.
 > API enriches via TMDB: `director`, `year`, `posterPath`, `overview`, `runtime`, `watchProvidersBr` (where to watch/rent in Brazil).
+> **Duplicates:** You cannot add a movie that already exists in your list (same `tmdbId` or same title+year). The API returns `400` with an informative message.
 
 ---
 
@@ -137,6 +138,31 @@ Lists the user's movies with filters and pagination.
   }
 }
 ```
+
+---
+
+### `POST /movies/deduplicate`
+Scans all of the user's movies, groups them by `tmdbId` (or by title+year when no tmdbId), and removes duplicates, keeping one representative per group (preferring the one with `tmdbId` and the oldest). Use for a "Remove duplicates" button on the frontend.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "removedCount": 3,
+    "groups": [
+      {
+        "kept": { "id": "...", "title": "...", "tmdbId": 27205, "..." },
+        "removed": [
+          { "id": "...", "title": "...", "..." }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- `removedCount`: number of movies removed.
+- `groups`: for each duplicate group, `kept` is the movie kept and `removed` are the ones deleted (and removed from the drawn list in cascade if they were there).
 
 ---
 
@@ -195,7 +221,7 @@ Returns the drawn list ordered by `order` (insertion order).
 ---
 
 ### `POST /movies/drawn/from-tmdb`
-Creates a movie from TMDB (same body as POST /movies) and adds it directly to the drawn list. Use this to add to the drawn queue without adding to the main list first.
+Creates a movie from TMDB (same body as POST /movies) and adds it directly to the drawn list. If the movie **already exists** in your list (same `tmdbId` or title+year), the existing one is added to the drawn list (no duplicate created).
 
 **Body:** same as create movie — `title` required; `tmdbId` or search by title/year.
 ```json

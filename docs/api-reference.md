@@ -89,6 +89,7 @@ Cria um novo filme. Busca automaticamente cartaz, diretor e ano na TMDB.
 
 > `tmdbId` é opcional. Se informado, usa esse ID específico da TMDB. Caso contrário, busca pelo título.
 > A API enriquece via TMDB: `director`, `year`, `posterPath`, `overview`, `runtime` e `watchProvidersBr` (onde assistir/alugar no Brasil).
+> **Duplicatas:** não é possível adicionar um filme que já existe na sua lista (mesmo `tmdbId` ou mesmo título+ano). Nesse caso a API retorna `400` com mensagem informativa.
 
 ---
 
@@ -137,6 +138,31 @@ Lista os filmes do usuário com filtros e paginação.
   }
 }
 ```
+
+---
+
+### `POST /movies/deduplicate`
+Varre todos os filmes do usuário, agrupa por `tmdbId` (ou, quando não houver, por título+ano) e remove duplicatas, mantendo um representante de cada grupo (preferindo o que tem `tmdbId` e o mais antigo). Útil para um botão "Remover duplicatas" no frontend.
+
+**Response `200`:**
+```json
+{
+  "data": {
+    "removedCount": 3,
+    "groups": [
+      {
+        "kept": { "id": "...", "title": "...", "tmdbId": 27205, "..." },
+        "removed": [
+          { "id": "...", "title": "...", "..." }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- `removedCount`: quantidade de filmes removidos.
+- `groups`: para cada grupo de duplicatas, `kept` é o filme mantido e `removed` são os que foram apagados (e removidos da lista de sorteados em cascata, se estivessem lá).
 
 ---
 
@@ -195,7 +221,7 @@ Retorna a lista de sorteados ordenada por `order` (ordem de inserção).
 ---
 
 ### `POST /movies/drawn/from-tmdb`
-Cria um filme a partir da TMDB (mesmo body do POST /movies) e adiciona-o diretamente à lista de sorteados. Útil para incluir na fila de sorteados sem passar pela lista geral.
+Cria um filme a partir da TMDB (mesmo body do POST /movies) e adiciona-o diretamente à lista de sorteados. Se o filme **já existir** na sua lista (mesmo `tmdbId` ou título+ano), o existente é adicionado à lista de sorteados (não cria duplicata).
 
 **Body:** igual ao de criar filme — `title` obrigatório; `tmdbId` ou busca por título/ano.
 ```json

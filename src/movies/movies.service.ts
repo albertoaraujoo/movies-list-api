@@ -31,6 +31,14 @@ export interface DrawnMovieWithMovie extends DrawnMovie {
   movie: Movie;
 }
 
+export interface DeduplicateResult {
+  removedCount: number;
+  groups: Array<{
+    kept: Movie;
+    removed: Movie[];
+  }>;
+}
+
 @Injectable()
 export class MoviesService {
   private readonly logger = new Logger(MoviesService.name);
@@ -39,6 +47,29 @@ export class MoviesService {
     private readonly prisma: PrismaService,
     private readonly tmdbService: TmdbService,
   ) {}
+
+  /**
+   * Verifica se já existe filme do usuário com o mesmo tmdbId ou mesmo título+ano (evita duplicatas).
+   */
+  private async findExistingDuplicate(
+    userId: string,
+    params: { tmdbId?: number | null; title: string; year?: number | null },
+  ): Promise<Movie | null> {
+    const { tmdbId, title, year } = params;
+    if (tmdbId != null) {
+      const byTmdb = await this.prisma.movie.findFirst({
+        where: { userId, tmdbId },
+      });
+      if (byTmdb) return byTmdb;
+    }
+    return this.prisma.movie.findFirst({
+      where: {
+        userId,
+        title: { equals: title.trim(), mode: 'insensitive' },
+        year: year ?? null,
+      },
+    });
+  }
 
   /**
    * Enriquece watchProvidersBr com logoUrl (URL completa) em cada provider para exibição no frontend.
@@ -99,6 +130,19 @@ export class MoviesService {
           watchProvidersBr: (tmdbData.watchProvidersBr ?? undefined) as Prisma.JsonValue,
         };
       }
+    }
+
+    const resolvedTmdbId = enrichedData.tmdbId ?? providedTmdbId ?? null;
+    const resolvedYear = year ?? enrichedData.year ?? null;
+    const existing = await this.findExistingDuplicate(userId, {
+      tmdbId: resolvedTmdbId,
+      title: title.trim(),
+      year: resolvedYear,
+    });
+    if (existing) {
+      throw new BadRequestException(
+        'Você já possui este filme na lista. Não é possível adicionar duplicatas.',
+      );
     }
 
     const movie = await this.prisma.movie.create({
@@ -330,12 +374,21 @@ export class MoviesService {
 
   /**
    * Cria um filme a partir da TMDB (como POST /movies) e adiciona diretamente à lista de sorteados.
-   * Útil para adicionar à fila de sorteados sem passar pela lista geral primeiro.
+   * Se o filme já existir na lista do usuário, adiciona o existente à lista de sorteados (evita duplicata).
    */
   async createMovieAndAddToDrawn(
     userId: string,
     createMovieDto: CreateMovieDto,
   ): Promise<DrawnMovieWithMovie> {
+    const { title, year, tmdbId } = createMovieDto;
+    const existing = await this.findExistingDuplicate(userId, {
+      tmdbId: tmdbId ?? null,
+      title: title.trim(),
+      year: year ?? null,
+    });
+    if (existing) {
+      return this.addToDrawnList(userId, existing.id);
+    }
     const movie = await this.create(userId, createMovieDto);
     return this.addToDrawnList(userId, movie.id);
   }
@@ -347,6 +400,51 @@ export class MoviesService {
       orderBy: { order: 'asc' },
     });
     return list.map((d) => ({ ...d, movie: this.withProviderLogoUrls(d.movie) })) as DrawnMovieWithMovie[];
+  }
+
+  /**
+   * Varre todos os filmes do usuário, agrupa por tmdbId (ou título+ano) e remove duplicatas,
+   * mantendo um representante de cada grupo (preferindo o que tem tmdbId e o mais antigo).
+   */
+  async deduplicate(userId: string): Promise<DeduplicateResult> {
+    const all = await this.prisma.movie.findMany({
+      where: { userId },
+      include: { drawn: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const key = (m: Movie) =>
+      m.tmdbId != null ? `tmdb:${m.tmdbId}` : `title:${m.title.toLowerCase().trim()}:year:${m.year ?? 'null'}`;
+
+    const byKey = new Map<string, Movie[]>();
+    for (const m of all) {
+      const k = key(m);
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k)!.push(m);
+    }
+
+    const groups: Array<{ kept: Movie; removed: Movie[] }> = [];
+    const toDelete: string[] = [];
+
+    for (const [, movies] of byKey) {
+      if (movies.length <= 1) continue;
+      const sorted = [...movies].sort((a, b) => {
+        const aHasTmdb = a.tmdbId != null ? 0 : 1;
+        const bHasTmdb = b.tmdbId != null ? 0 : 1;
+        if (aHasTmdb !== bHasTmdb) return aHasTmdb - bHasTmdb;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+      const [kept, ...removed] = sorted;
+      groups.push({ kept: this.withProviderLogoUrls(kept), removed: removed.map((m) => this.withProviderLogoUrls(m)) });
+      toDelete.push(...removed.map((m) => m.id));
+    }
+
+    if (toDelete.length > 0) {
+      await this.prisma.$transaction(toDelete.map((id) => this.prisma.movie.delete({ where: { id } })));
+      this.logger.log(`Deduplicação: ${toDelete.length} filme(s) removido(s) para o usuário ${userId}`);
+    }
+
+    return { removedCount: toDelete.length, groups };
   }
 
   async removeFromDrawnList(userId: string, drawnMovieId: string): Promise<void> {
