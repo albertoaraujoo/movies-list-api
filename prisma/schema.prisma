@@ -32,6 +32,8 @@ model User {
   movies     Movie[]
   lists      MovieList[]
   reviews    Review[]
+  reviewLikes    ReviewLike[]
+  reviewComments ReviewComment[]
   activities ActivityLog[]
   followers  UserFollow[]   @relation("Following")
   following  UserFollow[]   @relation("Follower")
@@ -88,6 +90,8 @@ model Review {
   userId    String
   movie     Movie     @relation(fields: [movieId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes     ReviewLike[]
+  comments  ReviewComment[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -95,11 +99,42 @@ model Review {
   @@map("reviews")
 }
 
+model ReviewLike {
+  reviewId  String
+  userId    String
+  createdAt DateTime @default(now())
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([reviewId, userId])
+  @@index([userId])
+  @@map("review_likes")
+}
+
+model ReviewComment {
+  id        String          @id @default(uuid())
+  text      String
+  reviewId  String
+  userId    String
+  parentId  String?
+  review    Review          @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    ReviewComment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   ReviewComment[] @relation("CommentThread")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([reviewId, createdAt])
+  @@index([parentId])
+  @@map("review_comments")
+}
+
 model MovieList {
   id          String          @id @default(uuid())
   name        String
   description String?
   isDefault   Boolean         @default(false)
+  isFavorites Boolean         @default(false)
   isNumbered  Boolean         @default(false)
   isRanked    Boolean         @default(false)
   userId      String
@@ -110,6 +145,7 @@ model MovieList {
 
   @@index([userId])
   @@index([userId, isDefault])
+  @@index([userId, isFavorites])
   @@map("movie_lists")
 }
 
