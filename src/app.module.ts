@@ -11,6 +11,7 @@ import { TmdbModule } from './tmdb/tmdb.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ListsModule } from './lists/lists.module';
 import { ActivityModule } from './activity/activity.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -56,5 +57,6 @@ import { ActivityModule } from './activity/activity.module';
       useClass: ThrottlerGuard,
     },
   ],
+  controllers: [AppController],
 })
 export class AppModule {}
