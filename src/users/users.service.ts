@@ -25,11 +25,13 @@ export interface UserProfile {
   image: string | null;
   username: string | null;
   privacy: ProfilePrivacy;
+  bio: string | null;
   usernameUpdatedAt: Date | null;
   nameEditedAt: Date | null;
   canChangeUsername: boolean;
   daysUntilUsernameChange: number;
   totalMovies: number;
+  uniqueListMoviesCount: number;
   watchedMovies: number;
   listsCount: number;
   followersCount: number;
@@ -42,6 +44,7 @@ export interface PublicUserProfile {
   image: string | null;
   username: string;
   privacy: ProfilePrivacy;
+  bio: string | null;
   watchedMovies: number;
   listsCount: number;
   followersCount: number;
@@ -49,6 +52,23 @@ export interface PublicUserProfile {
   isFollowing?: boolean;
   followsYou?: boolean;
   isMutual?: boolean;
+}
+
+export interface FollowUserItem {
+  id: string;
+  name: string;
+  username: string | null;
+  image: string | null;
+  isFollowing?: boolean;
+  followsYou?: boolean;
+}
+
+export interface UserSearchResult {
+  id: string;
+  name: string;
+  username: string;
+  image: string | null;
+  isFollowing: boolean;
 }
 
 @Injectable()
@@ -200,7 +220,7 @@ export class UsersService {
 
   async updateProfile(
     userId: string,
-    data: { name?: string; username?: string },
+    data: { name?: string; username?: string; bio?: string },
   ): Promise<UserProfile> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuário não encontrado');
@@ -210,6 +230,7 @@ export class UsersService {
       nameEditedAt?: Date;
       username?: string;
       usernameUpdatedAt?: Date;
+      bio?: string | null;
     } = {};
 
     if (data.name !== undefined) {
@@ -243,6 +264,17 @@ export class UsersService {
 
         updateData.username = normalized;
         updateData.usernameUpdatedAt = new Date();
+      }
+    }
+
+    if (data.bio !== undefined) {
+      const trimmed = data.bio.trim();
+      if (trimmed.length > 280) {
+        throw new BadRequestException('A bio deve ter no máximo 280 caracteres');
+      }
+      const normalizedBio = trimmed || null;
+      if (normalizedBio !== user.bio) {
+        updateData.bio = normalizedBio;
       }
     }
 
@@ -291,7 +323,7 @@ export class UsersService {
   }
 
   async getProfile(userId: string): Promise<UserProfile> {
-    const [user, totalMovies, watchedMovies, listsCount, followersCount, followingCount] =
+    const [user, totalMovies, uniqueListMovieRows, watchedMovies, listsCount, followersCount, followingCount] =
       await this.prisma.$transaction([
         this.prisma.user.findUnique({
           where: { id: userId },
@@ -302,11 +334,17 @@ export class UsersService {
             image: true,
             username: true,
             privacy: true,
+            bio: true,
             usernameUpdatedAt: true,
             nameEditedAt: true,
           },
         }),
         this.prisma.movie.count({ where: { userId } }),
+        this.prisma.movieListItem.findMany({
+          where: { list: { userId } },
+          distinct: ['movieId'],
+          select: { movieId: true },
+        }),
         this.prisma.movie.count({ where: { userId, watched: true } }),
         this.prisma.movieList.count({ where: { userId } }),
         this.prisma.userFollow.count({ where: { followingId: userId } }),
@@ -321,6 +359,7 @@ export class UsersService {
       ...user,
       ...usernameStatus,
       totalMovies,
+      uniqueListMoviesCount: uniqueListMovieRows.length,
       watchedMovies,
       listsCount,
       followersCount,
@@ -377,6 +416,7 @@ export class UsersService {
       image: user.image,
       username: user.username,
       privacy: user.privacy,
+      bio: user.bio,
       watchedMovies,
       listsCount,
       followersCount,
@@ -414,7 +454,7 @@ export class UsersService {
     });
   }
 
-  async getFollowers(userId: string, page = 1, limit = 20) {
+  async getFollowers(userId: string, page = 1, limit = 20, viewerId: string | null = null) {
     const skip = (page - 1) * limit;
     const where = { followingId: userId };
 
@@ -433,13 +473,16 @@ export class UsersService {
       this.prisma.userFollow.count({ where }),
     ]);
 
+    const users = data.map((f) => f.follower);
+    const enriched = await this.enrichFollowUsers(users, viewerId);
+
     return {
-      data: data.map((f) => f.follower),
+      data: enriched,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
-  async getFollowing(userId: string, page = 1, limit = 20) {
+  async getFollowing(userId: string, page = 1, limit = 20, viewerId: string | null = null) {
     const skip = (page - 1) * limit;
     const where = { followerId: userId };
 
@@ -458,9 +501,83 @@ export class UsersService {
       this.prisma.userFollow.count({ where }),
     ]);
 
+    const users = data.map((f) => f.following);
+    const enriched = await this.enrichFollowUsers(users, viewerId);
+
     return {
-      data: data.map((f) => f.following),
+      data: enriched,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  async searchUsers(query: string, viewerId: string, limit = 10): Promise<UserSearchResult[]> {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return [];
+
+    const normalizedQuery = normalizeUsername(trimmed.replace(/^@/, ''));
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: { not: viewerId },
+        username: { not: null },
+        privacy: ProfilePrivacy.public,
+        OR: [
+          { username: { contains: normalizedQuery, mode: 'insensitive' } },
+          { name: { contains: trimmed, mode: 'insensitive' } },
+        ],
+      },
+      take: Math.min(limit, 20),
+      orderBy: { username: 'asc' },
+      select: { id: true, name: true, username: true, image: true },
+    });
+
+    const following = await this.prisma.userFollow.findMany({
+      where: {
+        followerId: viewerId,
+        followingId: { in: users.map((u) => u.id) },
+      },
+      select: { followingId: true },
+    });
+    const followingSet = new Set(following.map((f) => f.followingId));
+
+    return users
+      .filter((u): u is typeof u & { username: string } => u.username != null)
+      .map((u) => ({
+        id: u.id,
+        name: u.name,
+        username: u.username,
+        image: u.image,
+        isFollowing: followingSet.has(u.id),
+      }));
+  }
+
+  private async enrichFollowUsers(
+    users: { id: string; name: string; username: string | null; image: string | null }[],
+    viewerId: string | null,
+  ): Promise<FollowUserItem[]> {
+    if (!viewerId || users.length === 0) {
+      return users.map((u) => ({ ...u, isFollowing: false, followsYou: false }));
+    }
+
+    const ids = users.map((u) => u.id);
+    const [viewerFollowing, viewerFollowers] = await this.prisma.$transaction([
+      this.prisma.userFollow.findMany({
+        where: { followerId: viewerId, followingId: { in: ids } },
+        select: { followingId: true },
+      }),
+      this.prisma.userFollow.findMany({
+        where: { followingId: viewerId, followerId: { in: ids } },
+        select: { followerId: true },
+      }),
+    ]);
+
+    const followingSet = new Set(viewerFollowing.map((f) => f.followingId));
+    const followersSet = new Set(viewerFollowers.map((f) => f.followerId));
+
+    return users.map((u) => ({
+      ...u,
+      isFollowing: followingSet.has(u.id),
+      followsYou: followersSet.has(u.id),
+    }));
   }
 }

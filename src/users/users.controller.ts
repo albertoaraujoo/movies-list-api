@@ -51,6 +51,19 @@ export class UsersController {
     return this.usersService.updatePrivacy(user.id, dto.privacy);
   }
 
+  @Get('search')
+  searchUsers(
+    @CurrentUser() user: User,
+    @Query('q') query?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.searchUsers(
+      query ?? '',
+      user.id,
+      limit ? parseInt(limit, 10) : 10,
+    );
+  }
+
   @Get('by-username/:username')
   getPublicProfile(
     @CurrentUser() user: User,
@@ -79,6 +92,7 @@ export class UsersController {
 
   @Get(':id/followers')
   getFollowers(
+    @CurrentUser() viewer: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -87,11 +101,13 @@ export class UsersController {
       id,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
+      viewer.id,
     );
   }
 
   @Get(':id/following')
   getFollowing(
+    @CurrentUser() viewer: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -100,6 +116,7 @@ export class UsersController {
       id,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
+      viewer.id,
     );
   }
 }

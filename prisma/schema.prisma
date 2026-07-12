@@ -35,6 +35,7 @@ model User {
   usernameUpdatedAt DateTime?
   nameEditedAt      DateTime?
   privacy    ProfilePrivacy @default(public)
+  bio        String?
   movies     Movie[]
   lists      MovieList[]
   reviews    Review[]

@@ -10,4 +10,9 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   username?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(280)
+  bio?: string;
 }
