@@ -24,6 +24,10 @@ export interface UserProfile {
   image: string | null;
   username: string | null;
   privacy: ProfilePrivacy;
+  usernameUpdatedAt: Date | null;
+  nameEditedAt: Date | null;
+  canChangeUsername: boolean;
+  daysUntilUsernameChange: number;
   totalMovies: number;
   watchedMovies: number;
   listsCount: number;
@@ -48,8 +52,50 @@ export interface PublicUserProfile {
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
+  private readonly usernameChangeCooldownDays = 30;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private getUsernameChangeStatus(user: {
+    username: string | null;
+    usernameUpdatedAt: Date | null;
+  }): { canChangeUsername: boolean; daysUntilUsernameChange: number } {
+    if (!user.username) {
+      return { canChangeUsername: true, daysUntilUsernameChange: 0 };
+    }
+
+    if (!user.usernameUpdatedAt) {
+      return { canChangeUsername: true, daysUntilUsernameChange: 0 };
+    }
+
+    const elapsedMs = Date.now() - user.usernameUpdatedAt.getTime();
+    const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+
+    if (elapsedDays >= this.usernameChangeCooldownDays) {
+      return { canChangeUsername: true, daysUntilUsernameChange: 0 };
+    }
+
+    return {
+      canChangeUsername: false,
+      daysUntilUsernameChange: this.usernameChangeCooldownDays - elapsedDays,
+    };
+  }
+
+  private assertCanChangeUsername(user: User, nextUsername: string): void {
+    const normalized = normalizeUsername(nextUsername);
+    if (user.username === normalized) return;
+
+    if (!user.username) return;
+
+    const { canChangeUsername, daysUntilUsernameChange } =
+      this.getUsernameChangeStatus(user);
+
+    if (!canChangeUsername) {
+      throw new BadRequestException(
+        `Você só pode alterar o username após ${this.usernameChangeCooldownDays} dias. Aguarde mais ${daysUntilUsernameChange} dia(s).`,
+      );
+    }
+  }
 
   async findById(id: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { id } });
@@ -80,9 +126,9 @@ export class UsersService {
         return this.prisma.user.update({
           where: { id: existingUser.id },
           data: {
-            name: data.name,
             email: data.email,
             ...(data.image !== undefined && { image: data.image }),
+            ...(existingUser.nameEditedAt == null && { name: data.name }),
           },
         });
       }
@@ -125,25 +171,66 @@ export class UsersService {
     return { available: !existing };
   }
 
-  async updateUsername(userId: string, username: string): Promise<User> {
-    const normalized = normalizeUsername(username);
-    if (!isValidUsername(normalized)) {
-      throw new BadRequestException(
-        'Username deve ter 3-20 caracteres: letras minúsculas, números e underscore.',
-      );
+  async updateUsername(userId: string, username: string): Promise<UserProfile> {
+    return this.updateProfile(userId, { username });
+  }
+
+  async updateProfile(
+    userId: string,
+    data: { name?: string; username?: string },
+  ): Promise<UserProfile> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    const updateData: {
+      name?: string;
+      nameEditedAt?: Date;
+      username?: string;
+      usernameUpdatedAt?: Date;
+    } = {};
+
+    if (data.name !== undefined) {
+      const trimmed = data.name.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Nome não pode ser vazio');
+      }
+      if (trimmed !== user.name) {
+        updateData.name = trimmed;
+        updateData.nameEditedAt = new Date();
+      }
     }
 
-    const existing = await this.prisma.user.findUnique({
-      where: { username: normalized },
-    });
-    if (existing && existing.id !== userId) {
-      throw new ConflictException('Username já está em uso');
+    if (data.username !== undefined) {
+      const normalized = normalizeUsername(data.username);
+      if (!isValidUsername(normalized)) {
+        throw new BadRequestException(
+          'Username deve ter 3-20 caracteres: letras minúsculas, números e underscore.',
+        );
+      }
+
+      if (normalized !== user.username) {
+        this.assertCanChangeUsername(user, normalized);
+
+        const existing = await this.prisma.user.findUnique({
+          where: { username: normalized },
+        });
+        if (existing && existing.id !== userId) {
+          throw new ConflictException('Username já está em uso');
+        }
+
+        updateData.username = normalized;
+        updateData.usernameUpdatedAt = new Date();
+      }
     }
 
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { username: normalized },
-    });
+    if (Object.keys(updateData).length > 0) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+      });
+    }
+
+    return this.getProfile(userId);
   }
 
   async updatePrivacy(userId: string, privacy: ProfilePrivacy): Promise<User> {
@@ -192,6 +279,8 @@ export class UsersService {
             image: true,
             username: true,
             privacy: true,
+            usernameUpdatedAt: true,
+            nameEditedAt: true,
           },
         }),
         this.prisma.movie.count({ where: { userId } }),
@@ -203,8 +292,11 @@ export class UsersService {
 
     if (!user) throw new NotFoundException('Usuário não encontrado');
 
+    const usernameStatus = this.getUsernameChangeStatus(user);
+
     return {
       ...user,
+      ...usernameStatus,
       totalMovies,
       watchedMovies,
       listsCount,

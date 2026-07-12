@@ -44,6 +44,11 @@ export class MoviesController {
     return this.moviesService.deduplicate(user.id);
   }
 
+  @Post('backfill-genres')
+  backfillGenres(@CurrentUser() user: User) {
+    return this.moviesService.backfillGenres(user.id);
+  }
+
   @Post('bulk')
   @HttpCode(HttpStatus.CREATED)
   bulkCreate(@CurrentUser() user: User, @Body() dto: BulkCreateMoviesDto) {

@@ -12,6 +12,7 @@ import { ListsService } from '../lists/lists.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { FilterMoviesDto } from './dto/filter-movies.dto';
+import { resolveGenreFilterValues } from './genre.utils';
 
 const DRAWN_LIST_MAX_SIZE = 30;
 const TMDB_LOGO_BASE_URL = 'https://image.tmdb.org/t/p/w92';
@@ -218,7 +219,9 @@ export class MoviesService {
       ...(watched !== undefined && { watched }),
       ...(year && { year }),
       ...(director && { director: { contains: director, mode: 'insensitive' } }),
-      ...(genre && { genres: { has: genre } }),
+      ...(genre && {
+        genres: { hasSome: resolveGenreFilterValues(genre) },
+      }),
       ...(search && {
         OR: [
           { title: { contains: search, mode: 'insensitive' } },
@@ -337,6 +340,62 @@ export class MoviesService {
 
     this.logger.log(`Filme "${movie.title}" sincronizado com TMDB ID ${tmdbData.tmdbId}`);
     return this.withProviderLogoUrls(updatedMovie);
+  }
+
+  async backfillGenres(
+    userId: string,
+    limit = 40,
+  ): Promise<{ updated: number; remaining: number }> {
+    const movies = await this.prisma.movie.findMany({
+      where: {
+        userId,
+        genres: { isEmpty: true },
+      },
+      select: { id: true, tmdbId: true, title: true, year: true },
+      take: limit,
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (movies.length === 0) {
+      return { updated: 0, remaining: 0 };
+    }
+
+    let updated = 0;
+    const concurrency = 5;
+
+    for (let i = 0; i < movies.length; i += concurrency) {
+      const batch = movies.slice(i, i + concurrency);
+      const results = await Promise.all(
+        batch.map(async (movie) => {
+          const tmdbData = movie.tmdbId
+            ? await this.tmdbService.getMovieDetails(movie.tmdbId)
+            : await this.tmdbService.searchAndEnrich(movie.title, movie.year);
+
+          if (!tmdbData?.genres?.length) return false;
+
+          await this.prisma.movie.update({
+            where: { id: movie.id },
+            data: {
+              genres: tmdbData.genres,
+              ...(movie.tmdbId == null && tmdbData.tmdbId ? { tmdbId: tmdbData.tmdbId } : {}),
+            },
+          });
+          return true;
+        }),
+      );
+
+      updated += results.filter(Boolean).length;
+    }
+
+    const remaining = await this.prisma.movie.count({
+      where: { userId, genres: { isEmpty: true } },
+    });
+
+    this.logger.log(
+      `Backfill de gêneros: ${updated} atualizado(s), ${remaining} pendente(s) (user ${userId})`,
+    );
+
+    return { updated, remaining };
   }
 
   async drawMovie(userId: string): Promise<DrawnMovieWithMovie> {

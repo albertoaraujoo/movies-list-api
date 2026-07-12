@@ -28,6 +28,8 @@ model User {
   image      String?
   googleId   String         @unique
   username   String?        @unique
+  usernameUpdatedAt DateTime?
+  nameEditedAt      DateTime?
   privacy    ProfilePrivacy @default(public)
   movies     Movie[]
   lists      MovieList[]

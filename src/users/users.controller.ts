@@ -17,6 +17,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UsersService } from './users.service';
 import { UpdateUsernameDto } from './dto/update-username.dto';
 import { UpdatePrivacyDto } from './dto/update-username.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import type { User } from '@prisma/client';
 
 @Controller('users')
@@ -33,6 +34,11 @@ export class UsersController {
   @Get('profile')
   getProfile(@CurrentUser() user: User) {
     return this.usersService.getProfile(user.id);
+  }
+
+  @Put('profile')
+  updateProfile(@CurrentUser() user: User, @Body() dto: UpdateProfileDto) {
+    return this.usersService.updateProfile(user.id, dto);
   }
 
   @Put('update-username')
