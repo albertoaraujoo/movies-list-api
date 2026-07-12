@@ -21,6 +21,10 @@ enum ActivityType {
   list_created
 }
 
+enum NotificationType {
+  user_followed
+}
+
 model User {
   id         String         @id @default(uuid())
   email      String         @unique
@@ -39,6 +43,8 @@ model User {
   activities ActivityLog[]
   followers  UserFollow[]   @relation("Following")
   following  UserFollow[]   @relation("Follower")
+  notificationsReceived Notification[] @relation("NotificationsReceived")
+  notificationsSent     Notification[] @relation("NotificationsSent")
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
@@ -184,4 +190,19 @@ model DrawnMovie {
   drawnAt DateTime @default(now())
 
   @@map("drawn_movies")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  actorId   String
+  type      NotificationType
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation("NotificationsReceived", fields: [userId], references: [id], onDelete: Cascade)
+  actor     User             @relation("NotificationsSent", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@map("notifications")
 }

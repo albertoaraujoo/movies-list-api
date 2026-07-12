@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ProfilePrivacy, type User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { isValidUsername, normalizeUsername } from '../common/utils/username.util';
 
 interface FindOrCreateUserDto {
@@ -46,6 +47,7 @@ export interface PublicUserProfile {
   followersCount: number;
   followingCount: number;
   isFollowing?: boolean;
+  followsYou?: boolean;
   isMutual?: boolean;
 }
 
@@ -54,7 +56,10 @@ export class UsersService {
   private readonly logger = new Logger(UsersService.name);
   private readonly usernameChangeCooldownDays = 30;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private getUsernameChangeStatus(user: {
     username: string | null;
@@ -346,14 +351,24 @@ export class UsersService {
       ]);
 
     let isFollowing = false;
+    let followsYou = false;
     let isMutual = false;
     if (viewerId && viewerId !== user.id) {
-      isFollowing = !!(await this.prisma.userFollow.findUnique({
-        where: {
-          followerId_followingId: { followerId: viewerId, followingId: user.id },
-        },
-      }));
-      isMutual = await this.isMutualFollow(viewerId, user.id);
+      const [viewerFollowsProfile, profileFollowsViewer] = await this.prisma.$transaction([
+        this.prisma.userFollow.findUnique({
+          where: {
+            followerId_followingId: { followerId: viewerId, followingId: user.id },
+          },
+        }),
+        this.prisma.userFollow.findUnique({
+          where: {
+            followerId_followingId: { followerId: user.id, followingId: viewerId },
+          },
+        }),
+      ]);
+      isFollowing = !!viewerFollowsProfile;
+      followsYou = !!profileFollowsViewer;
+      isMutual = isFollowing && followsYou;
     }
 
     return {
@@ -367,6 +382,7 @@ export class UsersService {
       followersCount,
       followingCount,
       isFollowing,
+      followsYou,
       isMutual,
     };
   }
@@ -385,6 +401,7 @@ export class UsersService {
     if (existing) throw new BadRequestException('Você já segue este usuário');
 
     await this.prisma.userFollow.create({ data: { followerId, followingId } });
+    await this.notificationsService.createFollowNotification(followingId, followerId);
   }
 
   async unfollow(followerId: string, followingId: string): Promise<void> {
