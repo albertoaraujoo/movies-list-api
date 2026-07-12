@@ -10,41 +10,132 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ProfilePrivacy {
+  public
+  private
+  friends
+}
+
+enum ActivityType {
+  movie_watched
+  list_created
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  image     String?
-  googleId  String   @unique
-  movies    Movie[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String         @id @default(uuid())
+  email      String         @unique
+  name       String
+  image      String?
+  googleId   String         @unique
+  username   String?        @unique
+  privacy    ProfilePrivacy @default(public)
+  movies     Movie[]
+  lists      MovieList[]
+  reviews    Review[]
+  activities ActivityLog[]
+  followers  UserFollow[]   @relation("Following")
+  following  UserFollow[]   @relation("Follower")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
   @@map("users")
 }
 
+model UserFollow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+  @@map("user_follows")
+}
+
 model Movie {
-  id                String      @id @default(uuid())
-  title             String
-  director          String?
-  year              Int?
-  notes             String?
-  watched           Boolean     @default(false)
-  tmdbId            Int?
-  posterPath        String?
-  overview          String?
-  runtime           Int?
-  watchProvidersBr  Json?
-  userRating        Float?
-  userId            String
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  drawn             DrawnMovie?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id               String          @id @default(uuid())
+  title            String
+  director         String?
+  year             Int?
+  notes            String?
+  watched          Boolean         @default(false)
+  tmdbId           Int?
+  posterPath       String?
+  overview         String?
+  runtime          Int?
+  watchProvidersBr Json?
+  userRating       Float?
+  genres           String[]        @default([])
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drawn            DrawnMovie?
+  review           Review?
+  listItems        MovieListItem[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@index([userId])
   @@index([userId, watched])
   @@map("movies")
+}
+
+model Review {
+  id        String    @id @default(uuid())
+  text      String
+  watchedAt DateTime?
+  movieId   String    @unique
+  userId    String
+  movie     Movie     @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("reviews")
+}
+
+model MovieList {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean         @default(false)
+  isNumbered  Boolean         @default(false)
+  isRanked    Boolean         @default(false)
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       MovieListItem[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@map("movie_lists")
+}
+
+model MovieListItem {
+  id      String    @id @default(uuid())
+  listId  String
+  movieId String
+  order   Int       @default(0)
+  list    MovieList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  movie   Movie     @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, movieId])
+  @@index([listId, order])
+  @@map("movie_list_items")
+}
+
+model ActivityLog {
+  id        String       @id @default(uuid())
+  type      ActivityType
+  userId    String
+  metadata  Json
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@index([userId, createdAt])
+  @@map("activity_logs")
 }
 
 model DrawnMovie {

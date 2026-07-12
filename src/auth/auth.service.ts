@@ -18,6 +18,8 @@ export interface AuthResponse {
     email: string;
     name: string;
     image: string | null;
+    username: string | null;
+    privacy: string;
   };
 }
 
@@ -57,6 +59,8 @@ export class AuthService {
         email: user.email,
         name: user.name,
         image: user.image,
+        username: user.username,
+        privacy: user.privacy,
       },
     };
   }
