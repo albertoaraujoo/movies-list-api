@@ -23,9 +23,9 @@ export interface PaginatedMovies {
     page: number;
     limit: number;
     totalPages: number;
+    watchedTotal: number;
+    unwatchedTotal: number;
   };
-  watched: Movie[];
-  unwatched: Movie[];
 }
 
 export interface DrawnMovieWithMovie extends DrawnMovie {
@@ -164,9 +164,15 @@ export class MoviesService {
       title: title.trim(),
       year: resolvedYear,
     });
+
+    // Filme já existe na biblioteca: só adiciona às listas pedidas (não cria duplicata)
     if (existing) {
+      if (listIds && listIds.length > 0) {
+        await this.listsService.addMovieToLists(userId, existing.id, listIds);
+        return this.withProviderLogoUrls(existing);
+      }
       throw new BadRequestException(
-        'Você já possui este filme na lista. Não é possível adicionar duplicatas.',
+        'Você já possui este filme na biblioteca. Não é possível adicionar duplicatas.',
       );
     }
 
@@ -222,7 +228,7 @@ export class MoviesService {
       }),
     };
 
-    const [data, total, watchedList, unwatchedList] = await this.prisma.$transaction([
+    const [data, total, watchedTotal, unwatchedTotal] = await this.prisma.$transaction([
       this.prisma.movie.findMany({
         where,
         skip,
@@ -231,16 +237,8 @@ export class MoviesService {
         include: { drawn: true, review: true },
       }),
       this.prisma.movie.count({ where }),
-      this.prisma.movie.findMany({
-        where: { userId, watched: true },
-        orderBy: { updatedAt: 'desc' },
-        include: { drawn: true, review: true },
-      }),
-      this.prisma.movie.findMany({
-        where: { userId, watched: false },
-        orderBy: { createdAt: 'desc' },
-        include: { drawn: true, review: true },
-      }),
+      this.prisma.movie.count({ where: { userId, watched: true } }),
+      this.prisma.movie.count({ where: { userId, watched: false } }),
     ]);
 
     const favorites = await this.listsService.getFavoritesMovieIds(userId);
@@ -250,15 +248,14 @@ export class MoviesService {
         data.map((m) => this.withProviderLogoUrls(m)),
         favorites,
       ),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-      watched: this.withFavoriteFlags(
-        watchedList.map((m) => this.withProviderLogoUrls(m)),
-        favorites,
-      ),
-      unwatched: this.withFavoriteFlags(
-        unwatchedList.map((m) => this.withProviderLogoUrls(m)),
-        favorites,
-      ),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        watchedTotal,
+        unwatchedTotal,
+      },
     };
   }
 
