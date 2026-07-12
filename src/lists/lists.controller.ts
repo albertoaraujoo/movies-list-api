@@ -91,4 +91,10 @@ export class ListsController {
   ) {
     return this.listsService.reorder(user.id, id, dto.movieIds);
   }
+
+  @Post(':id/deduplicate')
+  @HttpCode(HttpStatus.OK)
+  deduplicate(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.listsService.deduplicate(user.id, id);
+  }
 }
