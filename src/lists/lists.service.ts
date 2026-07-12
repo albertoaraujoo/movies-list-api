@@ -247,4 +247,38 @@ export class ListsService {
       }
     }
   }
+
+  async deduplicate(userId: string, listId: string): Promise<{ removedCount: number }> {
+    const list = await this.findOne(userId, listId);
+    const items = list.items ?? [];
+
+    const key = (movie: { tmdbId: number | null; title: string; year: number | null }) =>
+      movie.tmdbId != null
+        ? `tmdb:${movie.tmdbId}`
+        : `title:${movie.title.toLowerCase().trim()}:year:${movie.year ?? 'null'}`;
+
+    const seen = new Map<string, string>();
+    const toRemove: string[] = [];
+
+    for (const item of items) {
+      const k = key(item.movie);
+      if (seen.has(k)) {
+        toRemove.push(item.movieId);
+      } else {
+        seen.set(k, item.movieId);
+      }
+    }
+
+    for (const movieId of toRemove) {
+      await this.removeMovie(userId, listId, movieId);
+    }
+
+    if (toRemove.length > 0) {
+      this.logger.log(
+        `Deduplicação da lista ${listId}: ${toRemove.length} filme(s) removido(s)`,
+      );
+    }
+
+    return { removedCount: toRemove.length };
+  }
 }
