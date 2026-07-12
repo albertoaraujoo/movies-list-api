@@ -8,6 +8,7 @@ import {
 import type { Movie, DrawnMovie, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TmdbService } from '../tmdb/tmdb.service';
+import { ListsService } from '../lists/lists.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { FilterMoviesDto } from './dto/filter-movies.dto';
@@ -46,6 +47,7 @@ export class MoviesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tmdbService: TmdbService,
+    private readonly listsService: ListsService,
   ) {}
 
   /**
@@ -98,10 +100,10 @@ export class MoviesService {
   }
 
   async create(userId: string, createMovieDto: CreateMovieDto): Promise<Movie> {
-    const { title, year, tmdbId: providedTmdbId, ...rest } = createMovieDto;
+    const { title, year, tmdbId: providedTmdbId, listIds, ...rest } = createMovieDto;
 
     let enrichedData: Partial<
-      Pick<Movie, 'director' | 'year' | 'posterPath' | 'tmdbId' | 'overview' | 'runtime' | 'watchProvidersBr'>
+      Pick<Movie, 'director' | 'year' | 'posterPath' | 'tmdbId' | 'overview' | 'runtime' | 'watchProvidersBr' | 'genres'>
     > = {};
 
     if (providedTmdbId) {
@@ -114,6 +116,7 @@ export class MoviesService {
           tmdbId: tmdbData.tmdbId,
           overview: tmdbData.overview ?? undefined,
           runtime: tmdbData.runtime ?? undefined,
+          genres: tmdbData.genres ?? [],
           watchProvidersBr: (tmdbData.watchProvidersBr ?? undefined) as Prisma.JsonValue,
         };
       }
@@ -127,6 +130,7 @@ export class MoviesService {
           tmdbId: tmdbData.tmdbId,
           overview: tmdbData.overview ?? undefined,
           runtime: tmdbData.runtime ?? undefined,
+          genres: tmdbData.genres ?? [],
           watchProvidersBr: (tmdbData.watchProvidersBr ?? undefined) as Prisma.JsonValue,
         };
       }
@@ -154,11 +158,32 @@ export class MoviesService {
         userId,
       } as Prisma.MovieUncheckedCreateInput,
     });
+
+    if (listIds && listIds.length > 0) {
+      await this.listsService.addMovieToLists(userId, movie.id, listIds);
+    }
+
     return this.withProviderLogoUrls(movie);
   }
 
+  async bulkCreate(
+    userId: string,
+    movies: CreateMovieDto[],
+    listIds?: string[],
+  ): Promise<Movie[]> {
+    const created: Movie[] = [];
+    for (const dto of movies) {
+      const movie = await this.create(userId, {
+        ...dto,
+        listIds: listIds ?? dto.listIds,
+      });
+      created.push(movie);
+    }
+    return created;
+  }
+
   async findAll(userId: string, filters: FilterMoviesDto): Promise<PaginatedMovies> {
-    const { search, watched, year, director, page = 1, limit = 20 } = filters;
+    const { search, watched, year, director, genre, page = 1, limit = 20 } = filters;
     const skip = (page - 1) * limit;
 
     const where: Prisma.MovieWhereInput = {
@@ -166,6 +191,7 @@ export class MoviesService {
       ...(watched !== undefined && { watched }),
       ...(year && { year }),
       ...(director && { director: { contains: director, mode: 'insensitive' } }),
+      ...(genre && { genres: { has: genre } }),
       ...(search && {
         OR: [
           { title: { contains: search, mode: 'insensitive' } },
@@ -181,18 +207,18 @@ export class MoviesService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { drawn: true },
+        include: { drawn: true, review: true },
       }),
       this.prisma.movie.count({ where }),
       this.prisma.movie.findMany({
         where: { userId, watched: true },
         orderBy: { updatedAt: 'desc' },
-        include: { drawn: true },
+        include: { drawn: true, review: true },
       }),
       this.prisma.movie.findMany({
         where: { userId, watched: false },
         orderBy: { createdAt: 'desc' },
-        include: { drawn: true },
+        include: { drawn: true, review: true },
       }),
     ]);
 
@@ -207,7 +233,7 @@ export class MoviesService {
   async findOne(userId: string, movieId: string): Promise<Movie> {
     const movie = await this.prisma.movie.findUnique({
       where: { id: movieId },
-      include: { drawn: true },
+      include: { drawn: true, review: true },
     });
 
     if (!movie) {
@@ -274,6 +300,7 @@ export class MoviesService {
         year: movie.year ?? tmdbData.year,
         overview: tmdbData.overview ?? undefined,
         runtime: tmdbData.runtime ?? undefined,
+        genres: tmdbData.genres ?? movie.genres,
         watchProvidersBr: (tmdbData.watchProvidersBr ?? undefined) as Prisma.InputJsonValue,
       },
     });
@@ -283,9 +310,16 @@ export class MoviesService {
   }
 
   async drawMovie(userId: string): Promise<DrawnMovieWithMovie> {
+    const defaultMovieIds = await this.listsService.getDefaultListMovieIds(userId);
+
     return this.prisma.$transaction(async (tx) => {
       const eligibleMovies = await tx.movie.findMany({
-        where: { userId, watched: false, drawn: null },
+        where: {
+          userId,
+          watched: false,
+          drawn: null,
+          id: { in: defaultMovieIds.length > 0 ? defaultMovieIds : ['__none__'] },
+        },
         select: { id: true, title: true },
       });
 

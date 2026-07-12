@@ -6,6 +6,8 @@ import {
   IsBoolean,
   IsPositive,
   IsNumber,
+  IsArray,
+  IsUUID,
   Min,
   Max,
   MaxLength,
@@ -67,4 +69,9 @@ export class CreateMovieDto {
     },
   })
   userRating?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  listIds?: string[];
 }

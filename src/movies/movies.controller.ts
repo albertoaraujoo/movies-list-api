@@ -17,6 +17,7 @@ import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { FilterMoviesDto } from './dto/filter-movies.dto';
 import { SyncTmdbDto } from './dto/sync-tmdb.dto';
+import { BulkCreateMoviesDto } from './dto/bulk-create-movies.dto';
 import { AddToDrawnDto } from './dto/add-to-drawn.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -41,6 +42,12 @@ export class MoviesController {
   @Post('deduplicate')
   deduplicate(@CurrentUser() user: User) {
     return this.moviesService.deduplicate(user.id);
+  }
+
+  @Post('bulk')
+  @HttpCode(HttpStatus.CREATED)
+  bulkCreate(@CurrentUser() user: User, @Body() dto: BulkCreateMoviesDto) {
+    return this.moviesService.bulkCreate(user.id, dto.movies, dto.listIds);
   }
 
   @Get('drawn')

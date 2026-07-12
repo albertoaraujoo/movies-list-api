@@ -19,6 +19,11 @@ interface TmdbCrewMember {
   name: string;
 }
 
+interface TmdbGenre {
+  id: number;
+  name: string;
+}
+
 interface TmdbMovieDetailsResponse {
   id: number;
   title: string;
@@ -26,6 +31,7 @@ interface TmdbMovieDetailsResponse {
   poster_path: string | null;
   overview: string | null;
   runtime: number | null;
+  genres: TmdbGenre[];
   credits: {
     crew: TmdbCrewMember[];
   };
@@ -58,6 +64,7 @@ export interface TmdbEnrichedData {
   posterPath: string | null;
   overview: string | null;
   runtime: number | null;
+  genres: string[];
   watchProvidersBr: TmdbWatchProvidersBr | null;
 }
 
@@ -131,6 +138,7 @@ export class TmdbService {
       const runtime = data.runtime ?? null;
 
       const watchProvidersBr = await this.getWatchProvidersBr(tmdbId);
+      const genres = (data.genres ?? []).map((g) => g.name);
 
       return {
         tmdbId: data.id,
@@ -140,6 +148,7 @@ export class TmdbService {
         posterPath,
         overview,
         runtime,
+        genres,
         watchProvidersBr,
       };
     } catch (error) {

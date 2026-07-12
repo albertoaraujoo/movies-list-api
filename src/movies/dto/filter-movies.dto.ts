@@ -24,6 +24,10 @@ export class FilterMoviesDto {
   @IsOptional()
   director?: string;
 
+  @IsString()
+  @IsOptional()
+  genre?: string;
+
   @IsInt()
   @IsOptional()
   @Min(1)

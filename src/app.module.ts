@@ -8,6 +8,9 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { MoviesModule } from './movies/movies.module';
 import { TmdbModule } from './tmdb/tmdb.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { ListsModule } from './lists/lists.module';
+import { ActivityModule } from './activity/activity.module';
 
 @Module({
   imports: [
@@ -43,6 +46,9 @@ import { TmdbModule } from './tmdb/tmdb.module';
     AuthModule,
     UsersModule,
     MoviesModule,
+    ReviewsModule,
+    ListsModule,
+    ActivityModule,
   ],
   providers: [
     {
