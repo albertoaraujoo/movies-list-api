@@ -211,11 +211,20 @@ export class MoviesService {
   }
 
   async findAll(userId: string, filters: FilterMoviesDto): Promise<PaginatedMovies> {
-    const { search, watched, year, director, genre, page = 1, limit = 20 } = filters;
+    const { search, watched, year, director, genre, listId, page = 1, limit = 20 } = filters;
     const skip = (page - 1) * limit;
+
+    if (listId) {
+      await this.listsService.findOne(userId, listId);
+    }
+
+    const listScope: Prisma.MovieWhereInput = listId
+      ? { listItems: { some: { listId } } }
+      : {};
 
     const where: Prisma.MovieWhereInput = {
       userId,
+      ...listScope,
       ...(watched !== undefined && { watched }),
       ...(year && { year }),
       ...(director && { director: { contains: director, mode: 'insensitive' } }),
@@ -240,8 +249,8 @@ export class MoviesService {
         include: { drawn: true, review: true },
       }),
       this.prisma.movie.count({ where }),
-      this.prisma.movie.count({ where: { userId, watched: true } }),
-      this.prisma.movie.count({ where: { userId, watched: false } }),
+      this.prisma.movie.count({ where: { userId, watched: true, ...listScope } }),
+      this.prisma.movie.count({ where: { userId, watched: false, ...listScope } }),
     ]);
 
     const favorites = await this.listsService.getFavoritesMovieIds(userId);

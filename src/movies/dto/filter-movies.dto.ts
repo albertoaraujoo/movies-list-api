@@ -1,4 +1,4 @@
-import { IsOptional, IsBoolean, IsString, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsBoolean, IsString, IsInt, Min, Max, IsUUID } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class FilterMoviesDto {
@@ -27,6 +27,10 @@ export class FilterMoviesDto {
   @IsString()
   @IsOptional()
   genre?: string;
+
+  @IsUUID()
+  @IsOptional()
+  listId?: string;
 
   @IsInt()
   @IsOptional()
