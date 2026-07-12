@@ -135,6 +135,24 @@ export class UsersService {
       return existingUser;
     }
 
+    const existingByEmail = await this.prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingByEmail) {
+      this.logger.log(
+        `Vinculando Google ID ao usuário existente (${existingByEmail.email})`,
+      );
+      return this.prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: {
+          googleId: data.googleId,
+          ...(data.image !== undefined && { image: data.image }),
+          ...(existingByEmail.nameEditedAt == null && { name: data.name }),
+        },
+      });
+    }
+
     const newUser = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({ data });
       await tx.movieList.create({
