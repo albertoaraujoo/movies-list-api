@@ -99,6 +99,27 @@ export class MoviesService {
     return { ...item, watchProvidersBr };
   }
 
+  private withFavoriteFlag<T extends { id: string }>(
+    item: T,
+    favoriteIds: Set<string>,
+  ): T & { isFavorite: boolean } {
+    return { ...item, isFavorite: favoriteIds.has(item.id) };
+  }
+
+  private withFavoriteFlags<T extends { id: string }>(
+    items: T[],
+    favoriteIds: Set<string>,
+  ): (T & { isFavorite: boolean })[] {
+    return items.map((item) => this.withFavoriteFlag(item, favoriteIds));
+  }
+
+  private enrichMovie<T extends { id: string; watchProvidersBr?: Prisma.JsonValue | null }>(
+    item: T,
+    favoriteIds: Set<string>,
+  ): T & { isFavorite: boolean } {
+    return this.withFavoriteFlag(this.withProviderLogoUrls(item), favoriteIds);
+  }
+
   async create(userId: string, createMovieDto: CreateMovieDto): Promise<Movie> {
     const { title, year, tmdbId: providedTmdbId, listIds, ...rest } = createMovieDto;
 
@@ -222,11 +243,22 @@ export class MoviesService {
       }),
     ]);
 
+    const favorites = await this.listsService.getFavoritesMovieIds(userId);
+
     return {
-      data: data.map((m) => this.withProviderLogoUrls(m)),
+      data: this.withFavoriteFlags(
+        data.map((m) => this.withProviderLogoUrls(m)),
+        favorites,
+      ),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-      watched: watchedList.map((m) => this.withProviderLogoUrls(m)),
-      unwatched: unwatchedList.map((m) => this.withProviderLogoUrls(m)),
+      watched: this.withFavoriteFlags(
+        watchedList.map((m) => this.withProviderLogoUrls(m)),
+        favorites,
+      ),
+      unwatched: this.withFavoriteFlags(
+        unwatchedList.map((m) => this.withProviderLogoUrls(m)),
+        favorites,
+      ),
     };
   }
 
@@ -244,7 +276,8 @@ export class MoviesService {
       throw new ForbiddenException('Acesso negado: este filme pertence a outro usuário');
     }
 
-    return this.withProviderLogoUrls(movie);
+    const favoriteIds = await this.listsService.getFavoritesMovieIds(userId);
+    return this.enrichMovie(movie, favoriteIds);
   }
 
   async update(userId: string, movieId: string, updateMovieDto: UpdateMovieDto): Promise<Movie> {

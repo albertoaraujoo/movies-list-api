@@ -99,6 +99,14 @@ export class UsersService {
           userId: user.id,
         },
       });
+      await tx.movieList.create({
+        data: {
+          name: 'Favoritos',
+          description: 'Filmes favoritos',
+          isFavorites: true,
+          userId: user.id,
+        },
+      });
       return user;
     });
 

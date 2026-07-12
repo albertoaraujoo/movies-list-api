@@ -35,6 +35,22 @@ export class ListsService {
     });
   }
 
+  async ensureFavoritesList(userId: string) {
+    const existing = await this.prisma.movieList.findFirst({
+      where: { userId, isFavorites: true },
+    });
+    if (existing) return existing;
+
+    return this.prisma.movieList.create({
+      data: {
+        name: 'Favoritos',
+        description: 'Filmes favoritos',
+        isFavorites: true,
+        userId,
+      },
+    });
+  }
+
   async create(userId: string, dto: CreateListDto) {
     const list = await this.prisma.movieList.create({
       data: {
@@ -43,6 +59,7 @@ export class ListsService {
         isNumbered: dto.isNumbered ?? false,
         isRanked: dto.isRanked ?? false,
         isDefault: false,
+        isFavorites: false,
         userId,
       },
     });
@@ -57,9 +74,10 @@ export class ListsService {
 
   async findAll(userId: string) {
     await this.ensureDefaultList(userId);
+    await this.ensureFavoritesList(userId);
     return this.prisma.movieList.findMany({
       where: { userId },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ isDefault: 'desc' }, { isFavorites: 'desc' }, { createdAt: 'desc' }],
       include: { _count: { select: { items: true } } },
     });
   }
@@ -70,7 +88,7 @@ export class ListsService {
       include: {
         items: {
           orderBy: { order: 'asc' },
-          include: { movie: true },
+          include: { movie: { include: { drawn: true, review: true } } },
         },
       },
     });
@@ -78,13 +96,27 @@ export class ListsService {
     if (!list) throw new NotFoundException('Lista não encontrada');
     if (list.userId !== userId) throw new ForbiddenException('Acesso negado');
 
-    return list;
+    const favoriteIds = await this.getFavoritesMovieIds(userId);
+
+    return {
+      ...list,
+      items: list.items.map((item) => ({
+        ...item,
+        movie: {
+          ...item.movie,
+          isFavorite: favoriteIds.has(item.movieId),
+        },
+      })),
+    };
   }
 
   async update(userId: string, listId: string, dto: UpdateListDto) {
     const list = await this.findOne(userId, listId);
     if (list.isDefault && dto.name && dto.name !== list.name) {
       throw new BadRequestException('Não é possível renomear a lista principal');
+    }
+    if (list.isFavorites && dto.name && dto.name !== list.name) {
+      throw new BadRequestException('Não é possível renomear a lista de favoritos');
     }
 
     return this.prisma.movieList.update({
@@ -97,6 +129,9 @@ export class ListsService {
     const list = await this.findOne(userId, listId);
     if (list.isDefault) {
       throw new BadRequestException('Não é possível excluir a lista principal');
+    }
+    if (list.isFavorites) {
+      throw new BadRequestException('Não é possível excluir a lista de favoritos');
     }
     await this.prisma.movieList.delete({ where: { id: listId } });
   }
@@ -159,6 +194,47 @@ export class ListsService {
       select: { movieId: true },
     });
     return items.map((i) => i.movieId);
+  }
+
+  async getFavoritesMovieIds(userId: string): Promise<Set<string>> {
+    const favoritesList = await this.ensureFavoritesList(userId);
+    const items = await this.prisma.movieListItem.findMany({
+      where: { listId: favoritesList.id },
+      select: { movieId: true },
+    });
+    return new Set(items.map((i) => i.movieId));
+  }
+
+  async toggleFavorite(userId: string, movieId: string): Promise<{ isFavorite: boolean }> {
+    const favoritesList = await this.ensureFavoritesList(userId);
+
+    const movie = await this.prisma.movie.findUnique({ where: { id: movieId } });
+    if (!movie) throw new NotFoundException('Filme não encontrado');
+    if (movie.userId !== userId) throw new ForbiddenException('Acesso negado');
+
+    const existing = await this.prisma.movieListItem.findUnique({
+      where: { listId_movieId: { listId: favoritesList.id, movieId } },
+    });
+
+    if (existing) {
+      await this.prisma.movieListItem.delete({ where: { id: existing.id } });
+      return { isFavorite: false };
+    }
+
+    const maxOrder = await this.prisma.movieListItem.aggregate({
+      where: { listId: favoritesList.id },
+      _max: { order: true },
+    });
+
+    await this.prisma.movieListItem.create({
+      data: {
+        listId: favoritesList.id,
+        movieId,
+        order: (maxOrder._max.order ?? -1) + 1,
+      },
+    });
+
+    return { isFavorite: true };
   }
 
   async addMovieToLists(userId: string, movieId: string, listIds: string[]) {

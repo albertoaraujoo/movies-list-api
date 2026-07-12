@@ -18,6 +18,7 @@ import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
 import { AddMovieToListDto } from './dto/add-movie-to-list.dto';
 import { ReorderListDto } from './dto/reorder-list.dto';
+import { ToggleFavoriteDto } from './dto/toggle-favorite.dto';
 import type { User } from '@prisma/client';
 
 @Controller('lists')
@@ -34,6 +35,12 @@ export class ListsController {
   @Get()
   findAll(@CurrentUser() user: User) {
     return this.listsService.findAll(user.id);
+  }
+
+  @Post('favorites/toggle')
+  @HttpCode(HttpStatus.OK)
+  toggleFavorite(@CurrentUser() user: User, @Body() dto: ToggleFavoriteDto) {
+    return this.listsService.toggleFavorite(user.id, dto.movieId);
   }
 
   @Get(':id')

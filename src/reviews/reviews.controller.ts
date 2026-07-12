@@ -17,6 +17,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { CreateReviewCommentDto } from './dto/create-review-comment.dto';
 import type { User } from '@prisma/client';
 
 @Controller('reviews')
@@ -37,6 +38,21 @@ export class ReviewsController {
     );
   }
 
+  @Get('public/:username')
+  findPublicByUsername(
+    @CurrentUser() user: User,
+    @Param('username') username: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reviewsService.findPublicByUsername(
+      user.id,
+      username,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+    );
+  }
+
   @Get('movie/:movieId')
   findByMovie(
     @CurrentUser() user: User,
@@ -49,6 +65,36 @@ export class ReviewsController {
   @HttpCode(HttpStatus.CREATED)
   create(@CurrentUser() user: User, @Body() dto: CreateReviewDto) {
     return this.reviewsService.create(user.id, dto);
+  }
+
+  @Delete('comments/:commentId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeComment(
+    @CurrentUser() user: User,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
+  ) {
+    await this.reviewsService.removeComment(user.id, commentId);
+  }
+
+  @Get(':id/thread')
+  getThread(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.reviewsService.getThread(user.id, id);
+  }
+
+  @Post(':id/likes')
+  @HttpCode(HttpStatus.OK)
+  toggleLike(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.reviewsService.toggleLike(user.id, id);
+  }
+
+  @Post(':id/comments')
+  @HttpCode(HttpStatus.CREATED)
+  createComment(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateReviewCommentDto,
+  ) {
+    return this.reviewsService.createComment(user.id, id, dto);
   }
 
   @Put(':id')
